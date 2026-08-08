@@ -3,10 +3,10 @@
 ## Estado actual
 
 - **Fase 1 — Core: VALIDADA ✅**
-- **Fase 2 — Gacha backend: VALIDACIÓN REAL EN CURSO 🧪**
+- **Fase 2 — Gacha backend: NÚCLEO VALIDADO ✅ / ECONOMÍA ITEM PENDIENTE 🧪**
 - **Build actual de prueba:** `0.2.0-alpha.2`.
-- Catálogo, clasificación, filtros de banner y envío a PC ya comprobados dentro de Cobbleverse.
-- Se encontró un falso negativo al confirmar la entrega de Cobblemon en `alpha.1`; corregido en `alpha.2`, pendiente revalidar pity y transacción.
+- Catálogo, clasificación, filtros de banner, entrega, envío a PC y persistencia de pity ya comprobados dentro de Cobbleverse.
+- El falso negativo de entrega detectado en `alpha.1` quedó corregido y revalidado en `alpha.2`.
 
 ## Arquitectura prevista
 
@@ -23,7 +23,7 @@
 ## Fases
 
 1. **Core — VALIDADA ✅** — Base Fabric/Cobblemon/GeckoLib, configuración, datos, registro, comandos admin y validación de carga.
-2. **Gacha backend — VALIDACIÓN REAL EN CURSO 🧪** — Catálogo automático de rarezas, filtros, tiers, pools, pesos, probabilidades, pity, economía básica y entrega segura de Pokémon.
+2. **Gacha backend — NÚCLEO VALIDADO ✅ / ECONOMÍA ITEM PENDIENTE 🧪** — Catálogo automático de rarezas, filtros, tiers, pools, pesos, probabilidades, pity, economía básica y entrega segura de Pokémon.
 3. **Primer Gacha 3D** — Máquina, cápsulas, modelos, texturas, animaciones y sincronización servidor-cliente.
 4. **Hub + Centro Pokémon + Poké Mart** — Sistema de plantilla modular, plaza central, spawn, Centro Pokémon funcional, tienda configurable y espacios reservados para Gacha/Casino/Eventos.
 5. **Banners** — Banners permanentes/evento, rate-up avanzado, pity por banner y rotación de contenido.
@@ -52,7 +52,7 @@ Pruebas completadas en el pack real:
 
 ### Estado
 
-**IMPLEMENTADA, COMPILA Y ESTÁ EN VALIDACIÓN REAL**
+**NÚCLEO VALIDADO EN SERVIDOR REAL — pendiente únicamente la prueba de economía `ITEM` antes de cerrar la fase al 100%.**
 
 Build actual: **Emipokemon 0.2.0-alpha.2**.
 
@@ -65,10 +65,12 @@ Build actual: **Emipokemon 0.2.0-alpha.2**.
 - Charmander detectado como `EPIC` por label `starter`.
 - Metagross detectado como `EPIC` por label `powerhouse`.
 - `rayquaza_hoenn` construyó automáticamente un pool de Gen 3 con `COMMON=51`, `UNCOMMON=28`, `RARE=38`, `EPIC=8`, `LEGENDARY=8`, `MYTHICAL=2`.
-- Las tiradas reales entregaron Pokémon correctamente.
-- Con el equipo lleno, Cobblemon envió correctamente los premios al PC.
-- En `0.2.0-alpha.1` se detectó que Cobblemon podía entregar correctamente pero devolver valor numérico `0`; Emipokemon interpretaba eso como fallo, devolvía la moneda y no registraba pity.
-- `0.2.0-alpha.2` corrige la validación: usa el indicador booleano de éxito del comando y no exige `returnValue > 0`.
+- Las tiradas reales entregan Pokémon correctamente.
+- Con el equipo lleno, Cobblemon envía correctamente los premios al PC.
+- En `0.2.0-alpha.1` se detectó que Cobblemon podía entregar correctamente pero devolver valor numérico `0`; Emipokemon lo interpretaba como fallo, devolvía la moneda y no registraba pity.
+- `0.2.0-alpha.2` corrigió la validación usando el indicador booleano de éxito del comando.
+- La corrección fue revalidada: una tirada real confirma correctamente el premio y aumenta el pity.
+- El pity persistió después de reiniciar completamente el servidor (`total=2`, `épico=2/10`, `legendario=2/90`).
 
 ### Catálogo de Pokémon y rarezas
 
@@ -99,6 +101,7 @@ Banner de prueba actual:
 - Soft pity legendario configurable (por defecto desde la tirada 60).
 - Hard pity Legendario o superior configurable (por defecto 90 tiradas).
 - El progreso se guarda inmediatamente después de una entrega confirmada.
+- Persistencia de pity tras reinicio completo del servidor: **VALIDADA ✅**.
 
 ### Economía y entrega
 
@@ -127,9 +130,9 @@ Banner de prueba actual:
 - [x] `rayquaza_hoenn` genera un pool compatible con Gen 3.
 - [x] `pull` entrega Pokémon reales.
 - [x] Con equipo lleno, Cobblemon manda el premio al PC.
-- [ ] Revalidar en `alpha.2` que una entrega correcta confirma la tirada y aumenta pity.
-- [ ] Confirmar que `simulate` no altera pity ni entrega Pokémon.
-- [ ] Confirmar persistencia del pity tras reinicio.
+- [x] En `alpha.2` una entrega correcta confirma la tirada y aumenta pity.
+- [x] Persistencia del pity tras reinicio completo.
+- [ ] Confirmar explícitamente que `simulate` no altera pity ni entrega Pokémon.
 - [ ] Probar una transacción `ITEM` y su reembolso solo ante fallo real.
 
 ## Fase 4 — Hub + Centro Pokémon + Poké Mart
