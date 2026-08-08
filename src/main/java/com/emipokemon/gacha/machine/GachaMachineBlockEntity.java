@@ -272,11 +272,6 @@ public final class GachaMachineBlockEntity extends BlockEntity implements GeoBlo
         resultTier = nbt.contains("ResultTier") ? GachaTier.parse(nbt.getString("ResultTier"), null) : null;
         activePlayerUuid = nbt.containsUuid("ActivePlayer") ? nbt.getUuid("ActivePlayer") : null;
         activeTransactionId = nbt.containsUuid("ActiveTransaction") ? nbt.getUuid("ActiveTransaction") : null;
-
-        if (machineState.isBusy()) {
-            cancelPreparedReservation();
-            clearToIdle();
-        }
     }
 
     @Override
