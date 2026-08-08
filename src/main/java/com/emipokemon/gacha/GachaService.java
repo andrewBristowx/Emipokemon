@@ -34,6 +34,22 @@ public final class GachaService {
     }
 
     public PullOutcome pull(ServerPlayerEntity player, String bannerId) {
+        return pullInternal(player, bannerId, null);
+    }
+
+    public PullOutcome pullWithCurrencyOverride(
+            ServerPlayerEntity player,
+            String bannerId,
+            BannerDefinition.Currency currencyOverride
+    ) {
+        return pullInternal(player, bannerId, currencyOverride);
+    }
+
+    private PullOutcome pullInternal(
+            ServerPlayerEntity player,
+            String bannerId,
+            BannerDefinition.Currency currencyOverride
+    ) {
         BannerDefinition banner = banners.get(bannerId);
         if (banner == null || !banner.enabled) return PullOutcome.failure("Banner no encontrado o desactivado: " + bannerId);
         if (catalog.size() == 0) return PullOutcome.failure("El catalogo Pokemon aun no esta disponible.");
@@ -45,7 +61,8 @@ public final class GachaService {
             GachaRollResult result = roll(banner, progress);
             if (result == null) return PullOutcome.failure("El banner no tiene Pokemon validos para sus filtros/tiers.");
 
-            GachaCurrencyService.Result withdrawal = currency.withdraw(player, banner.currency);
+            BannerDefinition.Currency effectiveCurrency = currencyOverride == null ? banner.currency : currencyOverride;
+            GachaCurrencyService.Result withdrawal = currency.withdraw(player, effectiveCurrency);
             if (!withdrawal.success()) return PullOutcome.failure(withdrawal.error());
 
             if (!rewards.deliver(player, result)) {
