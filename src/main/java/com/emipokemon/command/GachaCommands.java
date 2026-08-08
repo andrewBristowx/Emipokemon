@@ -8,6 +8,7 @@ import com.emipokemon.gacha.GachaService;
 import com.emipokemon.gacha.GachaTier;
 import com.emipokemon.gacha.banner.BannerDefinition;
 import com.emipokemon.gacha.banner.BannerManager;
+import com.emipokemon.gacha.catalog.PokemonCatalogEntry;
 import com.emipokemon.gacha.catalog.PokemonCatalogService;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -51,6 +52,25 @@ public final class GachaCommands {
                                             "Catalogo Emipokemon: " + catalog.size() + " Pokemon | " + formatCountsLong(counts)), false);
                                     return catalog.size();
                                 }))
+                        .then(literal("inspect")
+                                .then(argument("pokemon", StringArgumentType.word())
+                                        .executes(context -> {
+                                            String id = StringArgumentType.getString(context, "pokemon");
+                                            PokemonCatalogEntry entry = catalog.get(id);
+                                            if (entry == null) {
+                                                context.getSource().sendError(Text.literal("Pokemon no encontrado en el catalogo: " + id));
+                                                return 0;
+                                            }
+                                            context.getSource().sendFeedback(() -> Text.literal(
+                                                    entry.displayName() + " | tier=" + entry.tier().name()
+                                                            + " | gen=" + entry.generation()
+                                                            + " | region=" + entry.region()
+                                                            + " | tipos=" + entry.types()
+                                                            + " | catchRate=" + entry.catchRate()
+                                                            + " | BST=" + entry.baseStatTotal()
+                                                            + " | labels=" + entry.labels()), false);
+                                            return 1;
+                                        })))
                         .then(literal("banners")
                                 .executes(context -> {
                                     String names = banners.all().stream()
