@@ -6,10 +6,12 @@ on:
       - main
       - agent/phase-1-core
       - agent/phase-2-gacha-dev2
+      - agent/phase-3-gacha-3d
   pull_request:
     branches:
       - main
       - agent/phase-1-core
+      - agent/phase-2-gacha-dev2
 
 jobs:
   build:

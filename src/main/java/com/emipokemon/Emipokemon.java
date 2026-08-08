@@ -2,6 +2,7 @@ package com.emipokemon;
 
 import com.emipokemon.command.EmipokemonCommands;
 import com.emipokemon.command.GachaCommands;
+import com.emipokemon.command.Phase3Commands;
 import com.emipokemon.config.ConfigManager;
 import com.emipokemon.data.PlayerDataManager;
 import com.emipokemon.gacha.GachaService;
@@ -16,7 +17,7 @@ import org.slf4j.LoggerFactory;
 
 public final class Emipokemon implements ModInitializer {
     public static final String MOD_ID = "emipokemon";
-    public static final String VERSION = "0.2.0-alpha.2";
+    public static final String VERSION = "0.3.0-alpha.1";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
     private static final ConfigManager CONFIG_MANAGER = new ConfigManager();
@@ -34,6 +35,7 @@ public final class Emipokemon implements ModInitializer {
         ModRegistries.initialize();
         EmipokemonCommands.register(CONFIG_MANAGER, PLAYER_DATA_MANAGER);
         GachaCommands.register(POKEMON_CATALOG, BANNER_MANAGER, GACHA_SERVICE, PLAYER_DATA_MANAGER);
+        Phase3Commands.register();
 
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
                 PLAYER_DATA_MANAGER.load(handler.player.getUuid()));
