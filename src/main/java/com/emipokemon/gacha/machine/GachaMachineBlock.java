@@ -1,6 +1,5 @@
 package com.emipokemon.gacha.machine;
 
-import com.emipokemon.gacha.GachaRollResult;
 import com.emipokemon.gacha.GachaService;
 import com.emipokemon.registry.ModRegistries;
 import com.mojang.serialization.MapCodec;
@@ -80,17 +79,13 @@ public final class GachaMachineBlock extends BlockWithEntity {
         if (!(player instanceof ServerPlayerEntity serverPlayer)) return ActionResult.PASS;
         if (!(world.getBlockEntity(pos) instanceof GachaMachineBlockEntity machine)) return ActionResult.PASS;
 
-        GachaService.PullOutcome outcome = machine.tryPull(serverPlayer);
+        GachaService.PrepareOutcome outcome = machine.tryStartPull(serverPlayer);
         if (!outcome.success()) {
             serverPlayer.sendMessage(Text.literal("Gacha: " + outcome.error()), false);
             return ActionResult.FAIL;
         }
 
-        GachaRollResult result = outcome.result();
-        serverPlayer.sendMessage(Text.literal(
-                "GACHA MACHINE: " + result.tier().name() + " -> " + result.pokemon().displayName()
-                        + " Nv." + result.level() + (result.shiny() ? " SHINY" : "")
-        ), false);
+        serverPlayer.sendMessage(Text.literal("Gacha: tirada iniciada - " + machine.getBannerId()), false);
         return ActionResult.SUCCESS;
     }
 
