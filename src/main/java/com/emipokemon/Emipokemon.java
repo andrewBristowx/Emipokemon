@@ -9,7 +9,6 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import software.bernie.geckolib.GeckoLib;
 
 public final class Emipokemon implements ModInitializer {
     public static final String MOD_ID = "emipokemon";
@@ -23,7 +22,6 @@ public final class Emipokemon implements ModInitializer {
     public void onInitialize() {
         LOGGER.info("Starting Emipokemon {}", VERSION);
 
-        GeckoLib.initialize();
         CONFIG_MANAGER.initialize();
         ModRegistries.initialize();
         EmipokemonCommands.register(CONFIG_MANAGER, PLAYER_DATA_MANAGER);
