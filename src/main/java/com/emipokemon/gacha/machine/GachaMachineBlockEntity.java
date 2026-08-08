@@ -1,12 +1,14 @@
 package com.emipokemon.gacha.machine;
 
 import com.emipokemon.Emipokemon;
+import com.emipokemon.gacha.GachaRollResult;
 import com.emipokemon.gacha.GachaService;
 import com.emipokemon.gacha.GachaTier;
 import com.emipokemon.gacha.banner.BannerDefinition;
 import com.emipokemon.registry.ModRegistries;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.item.Item;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.network.listener.ClientPlayPacketListener;
 import net.minecraft.network.packet.Packet;
@@ -14,6 +16,7 @@ import net.minecraft.network.packet.s2c.play.BlockEntityUpdateS2CPacket;
 import net.minecraft.registry.RegistryWrapper;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import software.bernie.geckolib.animatable.GeoBlockEntity;
@@ -43,7 +46,9 @@ public final class GachaMachineBlockEntity extends BlockEntity implements GeoBlo
     private GachaMachineState machineState = GachaMachineState.IDLE;
     private GachaTier resultTier;
     private UUID activePlayerUuid;
+    private UUID activeTransactionId;
     private int phaseTicks;
+    private transient GachaService.PreparedPull preparedPull;
 
     public GachaMachineBlockEntity(BlockPos pos, BlockState state) {
         super(ModRegistries.GACHA_MACHINE_BLOCK_ENTITY, pos, state);
@@ -71,65 +76,119 @@ public final class GachaMachineBlockEntity extends BlockEntity implements GeoBlo
         return machineState.isBusy();
     }
 
-    public GachaService.PullOutcome tryPull(ServerPlayerEntity player) {
+    public GachaService.PrepareOutcome tryStartPull(ServerPlayerEntity player) {
         if (world == null || world.isClient) {
-            return GachaService.PullOutcome.failure("La maquina solo puede activarse desde el servidor.");
+            return GachaService.PrepareOutcome.failure("La maquina solo puede activarse desde el servidor.");
         }
         if (isBusy()) {
-            return GachaService.PullOutcome.failure("La maquina esta procesando otra tirada.");
+            return GachaService.PrepareOutcome.failure("La maquina esta procesando otra tirada.");
         }
 
         BannerDefinition banner = Emipokemon.bannerManager().get(bannerId);
         if (banner == null || !banner.enabled) {
             setError();
-            return GachaService.PullOutcome.failure("Banner no encontrado o desactivado: " + bannerId);
+            return GachaService.PrepareOutcome.failure("Banner no encontrado o desactivado: " + bannerId);
         }
 
-        BannerDefinition.Currency ticketCost = new BannerDefinition.Currency();
-        ticketCost.type = "ITEM";
-        ticketCost.itemId = isEmiBanner(bannerId)
-                ? "emipokemon:emi_special_banner_ticket"
-                : "emipokemon:gacha_ticket";
-        ticketCost.amount = 1;
-        ticketCost.normalize();
+        Item requiredTicket = isEmiBanner(bannerId)
+                ? ModRegistries.EMI_SPECIAL_BANNER_TICKET
+                : ModRegistries.GACHA_TICKET;
+        if (player.getInventory().count(requiredTicket) < 1) {
+            return GachaService.PrepareOutcome.failure(
+                    isEmiBanner(bannerId)
+                            ? "Necesitas 1x Ticket Especial de Emi."
+                            : "Necesitas 1x Gacha Ticket."
+            );
+        }
 
+        GachaService.PrepareOutcome preparation = Emipokemon.gachaService().preparePull(player, bannerId);
+        if (!preparation.success()) {
+            setError();
+            return preparation;
+        }
+
+        this.preparedPull = preparation.preparedPull();
         this.activePlayerUuid = player.getUuid();
+        this.activeTransactionId = preparedPull.transactionId();
+        this.resultTier = preparedPull.result().tier();
         this.machineState = GachaMachineState.ACTIVATING;
         this.phaseTicks = 10;
         markAndSync();
-
-        GachaService.PullOutcome outcome = Emipokemon.gachaService().pullWithCurrencyOverride(player, bannerId, ticketCost);
-        if (!outcome.success()) {
-            setError();
-            return outcome;
-        }
-
-        this.resultTier = outcome.result().tier();
-        this.machineState = GachaMachineState.ROLLING;
-        this.phaseTicks = 60;
-        markAndSync();
-        return outcome;
+        return preparation;
     }
 
     public void forceReset() {
-        this.machineState = GachaMachineState.IDLE;
-        this.resultTier = null;
-        this.activePlayerUuid = null;
-        this.phaseTicks = 0;
+        cancelPreparedReservation();
+        clearToIdle();
         markAndSync();
     }
 
     private void setError() {
+        cancelPreparedReservation();
         this.machineState = GachaMachineState.ERROR;
         this.resultTier = null;
         this.activePlayerUuid = null;
+        this.activeTransactionId = null;
+        this.preparedPull = null;
         this.phaseTicks = 24;
         markAndSync();
+    }
+
+    private void clearToIdle() {
+        this.machineState = GachaMachineState.IDLE;
+        this.resultTier = null;
+        this.activePlayerUuid = null;
+        this.activeTransactionId = null;
+        this.preparedPull = null;
+        this.phaseTicks = 0;
+    }
+
+    private void cancelPreparedReservation() {
+        if (activePlayerUuid != null && activeTransactionId != null) {
+            Emipokemon.gachaService().cancelPreparedPull(activePlayerUuid, activeTransactionId);
+        }
+    }
+
+    private BannerDefinition.Currency ticketCost() {
+        BannerDefinition.Currency cost = new BannerDefinition.Currency();
+        cost.type = "ITEM";
+        cost.itemId = isEmiBanner(bannerId)
+                ? "emipokemon:emi_special_banner_ticket"
+                : "emipokemon:gacha_ticket";
+        cost.amount = 1;
+        cost.normalize();
+        return cost;
     }
 
     private boolean isEmiBanner(String id) {
         String normalized = id == null ? "" : id.toLowerCase(Locale.ROOT);
         return normalized.startsWith("emi_") || normalized.contains("emi_special");
+    }
+
+    private GachaService.PullOutcome commitPrepared(ServerWorld serverWorld) {
+        if (preparedPull == null || activePlayerUuid == null || activeTransactionId == null) {
+            return GachaService.PullOutcome.failure("La tirada preparada ya no esta disponible.");
+        }
+
+        ServerPlayerEntity player = serverWorld.getServer().getPlayerManager().getPlayer(activePlayerUuid);
+        if (player == null) {
+            cancelPreparedReservation();
+            return GachaService.PullOutcome.failure("El jugador se desconecto antes de completar la tirada.");
+        }
+
+        GachaService.PullOutcome outcome = Emipokemon.gachaService()
+                .commitPreparedPull(player, preparedPull, ticketCost());
+        if (outcome.success()) {
+            GachaRollResult result = outcome.result();
+            player.sendMessage(Text.literal(
+                    "GACHA: " + result.tier().name() + " -> " + result.pokemon().displayName()
+                            + " Nv." + result.level()
+                            + (result.shiny() ? " SHINY" : "")
+            ), false);
+        } else {
+            player.sendMessage(Text.literal("Gacha: " + outcome.error()), false);
+        }
+        return outcome;
     }
 
     public static void tick(World world, BlockPos pos, BlockState state, GachaMachineBlockEntity machine) {
@@ -144,10 +203,22 @@ public final class GachaMachineBlockEntity extends BlockEntity implements GeoBlo
                 machine.phaseTicks = 60;
             }
             case ROLLING -> {
-                if (machine.resultTier == null) {
-                    machine.machineState = GachaMachineState.ERROR;
-                    machine.phaseTicks = 24;
-                } else if (machine.resultTier.isAtLeast(GachaTier.LEGENDARY)) {
+                if (!(world instanceof ServerWorld serverWorld)) {
+                    machine.setError();
+                    return;
+                }
+
+                GachaService.PullOutcome committed = machine.commitPrepared(serverWorld);
+                if (!committed.success()) {
+                    machine.setError();
+                    return;
+                }
+
+                machine.preparedPull = null;
+                machine.activeTransactionId = null;
+                machine.resultTier = committed.result().tier();
+
+                if (machine.resultTier.isAtLeast(GachaTier.LEGENDARY)) {
                     machine.machineState = GachaMachineState.REVEAL_LEGENDARY;
                     machine.phaseTicks = 42;
                 } else if (machine.resultTier.isAtLeast(GachaTier.EPIC)) {
@@ -158,12 +229,7 @@ public final class GachaMachineBlockEntity extends BlockEntity implements GeoBlo
                     machine.phaseTicks = 20;
                 }
             }
-            case REVEAL_COMMON, REVEAL_EPIC, REVEAL_LEGENDARY, ERROR -> {
-                machine.machineState = GachaMachineState.IDLE;
-                machine.resultTier = null;
-                machine.activePlayerUuid = null;
-                machine.phaseTicks = 0;
-            }
+            case REVEAL_COMMON, REVEAL_EPIC, REVEAL_LEGENDARY, ERROR -> machine.clearToIdle();
             case IDLE -> machine.phaseTicks = 0;
         }
         machine.markAndSync();
@@ -177,6 +243,12 @@ public final class GachaMachineBlockEntity extends BlockEntity implements GeoBlo
     }
 
     @Override
+    public void markRemoved() {
+        cancelPreparedReservation();
+        super.markRemoved();
+    }
+
+    @Override
     protected void writeNbt(NbtCompound nbt, RegistryWrapper.WrapperLookup registryLookup) {
         super.writeNbt(nbt, registryLookup);
         nbt.putString("BannerId", bannerId);
@@ -184,6 +256,7 @@ public final class GachaMachineBlockEntity extends BlockEntity implements GeoBlo
         nbt.putInt("PhaseTicks", phaseTicks);
         if (resultTier != null) nbt.putString("ResultTier", resultTier.name());
         if (activePlayerUuid != null) nbt.putUuid("ActivePlayer", activePlayerUuid);
+        if (activeTransactionId != null) nbt.putUuid("ActiveTransaction", activeTransactionId);
     }
 
     @Override
@@ -198,12 +271,11 @@ public final class GachaMachineBlockEntity extends BlockEntity implements GeoBlo
         phaseTicks = Math.max(0, nbt.getInt("PhaseTicks"));
         resultTier = nbt.contains("ResultTier") ? GachaTier.parse(nbt.getString("ResultTier"), null) : null;
         activePlayerUuid = nbt.containsUuid("ActivePlayer") ? nbt.getUuid("ActivePlayer") : null;
+        activeTransactionId = nbt.containsUuid("ActiveTransaction") ? nbt.getUuid("ActiveTransaction") : null;
 
-        if (machineState.isBusy() && world == null) {
-            machineState = GachaMachineState.IDLE;
-            phaseTicks = 0;
-            activePlayerUuid = null;
-            resultTier = null;
+        if (machineState.isBusy()) {
+            cancelPreparedReservation();
+            clearToIdle();
         }
     }
 
