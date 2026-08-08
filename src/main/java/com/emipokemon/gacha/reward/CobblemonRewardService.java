@@ -9,6 +9,7 @@ import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public final class CobblemonRewardService {
     public boolean deliver(ServerPlayerEntity player, GachaRollResult result) {
@@ -31,16 +32,37 @@ public final class CobblemonRewardService {
 
             AtomicBoolean completed = new AtomicBoolean(false);
             AtomicBoolean successful = new AtomicBoolean(false);
+            AtomicInteger returnValue = new AtomicInteger(0);
             ServerCommandSource source = baseSource.withReturnValueConsumer((success, value) -> {
                 completed.set(true);
-                successful.set(success && value > 0);
+                successful.set(success);
+                returnValue.set(value);
             });
 
             server.getCommandManager().executeWithPrefix(source, command);
-            if (!completed.get() || !successful.get()) {
-                Emipokemon.LOGGER.error("Cobblemon reward command did not complete successfully: {}", command);
-                return false;
+
+            // Cobblemon can legitimately return 0 after a successful give (notably when the
+            // Pokemon is routed to storage). The boolean success flag is authoritative here;
+            // treating returnValue > 0 as mandatory caused successful rewards to be refunded
+            // and prevented pity from being committed.
+            if (completed.get()) {
+                if (!successful.get()) {
+                    Emipokemon.LOGGER.error(
+                            "Cobblemon reward command reported failure (returnValue={}): {}",
+                            returnValue.get(), command
+                    );
+                    return false;
+                }
+                return true;
             }
+
+            // Some command implementations do not publish a return-value callback. At this
+            // point parsing succeeded and executeWithPrefix returned without throwing; the
+            // command is built only from a catalog-validated species and the current player.
+            Emipokemon.LOGGER.warn(
+                    "Cobblemon reward command completed without a return callback; accepting delivery: {}",
+                    command
+            );
             return true;
         } catch (Exception exception) {
             Emipokemon.LOGGER.error("Could not deliver gacha Pokemon with command {}", command, exception);
