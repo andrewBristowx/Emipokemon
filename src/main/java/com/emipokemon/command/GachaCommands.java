@@ -113,6 +113,7 @@ public final class GachaCommands {
                                             return 1;
                                         })))
                         .then(literal("pull")
+                                .requires(source -> source.hasPermissionLevel(4))
                                 .then(argument("banner", StringArgumentType.word())
                                         .executes(context -> {
                                             ServerPlayerEntity player = context.getSource().getPlayer();
