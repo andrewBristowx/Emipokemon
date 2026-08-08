@@ -3,10 +3,10 @@
 ## Estado actual
 
 - **Fase 1 — Core: VALIDADA ✅**
-- **Fase 2 — Gacha backend: IMPLEMENTADA Y COMPILA ✅ / PENDIENTE VALIDACIÓN REAL 🧪**
-- **Siguiente validación:** probar Fase 2 dentro del pack real de Cobbleverse.
-- Validación real de Fase 1 realizada en Cobbleverse 1.21.1 con Cobblemon 1.7.3.
-- Persistencia confirmada tras reconexión y tras reinicio completo del servidor (`debugCounter` 1 → 2 → 3).
+- **Fase 2 — Gacha backend: VALIDACIÓN REAL EN CURSO 🧪**
+- **Build actual de prueba:** `0.2.0-alpha.2`.
+- Catálogo, clasificación, filtros de banner y envío a PC ya comprobados dentro de Cobbleverse.
+- Se encontró un falso negativo al confirmar la entrega de Cobblemon en `alpha.1`; corregido en `alpha.2`, pendiente revalidar pity y transacción.
 
 ## Arquitectura prevista
 
@@ -23,7 +23,7 @@
 ## Fases
 
 1. **Core — VALIDADA ✅** — Base Fabric/Cobblemon/GeckoLib, configuración, datos, registro, comandos admin y validación de carga.
-2. **Gacha backend — IMPLEMENTADA / COMPILA ✅ / PENDIENTE PRUEBA REAL 🧪** — Catálogo automático de rarezas, filtros, tiers, pools, pesos, probabilidades, pity, economía básica y entrega segura de Pokémon.
+2. **Gacha backend — VALIDACIÓN REAL EN CURSO 🧪** — Catálogo automático de rarezas, filtros, tiers, pools, pesos, probabilidades, pity, economía básica y entrega segura de Pokémon.
 3. **Primer Gacha 3D** — Máquina, cápsulas, modelos, texturas, animaciones y sincronización servidor-cliente.
 4. **Hub + Centro Pokémon + Poké Mart** — Sistema de plantilla modular, plaza central, spawn, Centro Pokémon funcional, tienda configurable y espacios reservados para Gacha/Casino/Eventos.
 5. **Banners** — Banners permanentes/evento, rate-up avanzado, pity por banner y rotación de contenido.
@@ -52,9 +52,23 @@ Pruebas completadas en el pack real:
 
 ### Estado
 
-**IMPLEMENTADA Y COMPILA EN CI — pendiente validación dentro del servidor real**
+**IMPLEMENTADA, COMPILA Y ESTÁ EN VALIDACIÓN REAL**
 
-Build de desarrollo: **Emipokemon 0.2.0-alpha.1**.
+Build actual: **Emipokemon 0.2.0-alpha.2**.
+
+### Pruebas reales ya completadas
+
+- El catálogo detectó **1025 Pokémon** cargados por Cobbleverse/Cobblemon y addons.
+- Distribución observada: `COMMON=313`, `UNCOMMON=196`, `RARE=347`, `EPIC=64`, `LEGENDARY=82`, `MYTHICAL=23`.
+- Rayquaza detectado como `LEGENDARY`, Gen 3, Hoenn, Dragón/Volador.
+- Deoxys detectado como `MYTHICAL`, Gen 3, Hoenn.
+- Charmander detectado como `EPIC` por label `starter`.
+- Metagross detectado como `EPIC` por label `powerhouse`.
+- `rayquaza_hoenn` construyó automáticamente un pool de Gen 3 con `COMMON=51`, `UNCOMMON=28`, `RARE=38`, `EPIC=8`, `LEGENDARY=8`, `MYTHICAL=2`.
+- Las tiradas reales entregaron Pokémon correctamente.
+- Con el equipo lleno, Cobblemon envió correctamente los premios al PC.
+- En `0.2.0-alpha.1` se detectó que Cobblemon podía entregar correctamente pero devolver valor numérico `0`; Emipokemon interpretaba eso como fallo, devolvía la moneda y no registraba pity.
+- `0.2.0-alpha.2` corrige la validación: usa el indicador booleano de éxito del comando y no exige `returnValue > 0`.
 
 ### Catálogo de Pokémon y rarezas
 
@@ -67,31 +81,16 @@ Build de desarrollo: **Emipokemon 0.2.0-alpha.1**.
 
 ### Banners y filtros
 
-Los banners son JSON configurables y pueden filtrar por:
+Los banners son JSON configurables y pueden filtrar por generación, región, tipo, labels requeridos/excluidos, especies excluidas y tiers permitidos.
 
-- generación;
-- región;
-- tipo;
-- labels requeridos;
-- labels excluidos;
-- especies excluidas;
-- tiers permitidos.
+También pueden configurar pesos de cada tier, Pokémon destacados, niveles, shiny chance, moneda/precio y pity.
 
-También pueden configurar:
-
-- pesos de cada tier;
-- Pokémon destacados y multiplicador de rate-up;
-- nivel mínimo/máximo por tier;
-- probabilidad shiny por tier;
-- moneda y precio;
-- soft pity, hard pity y garantía épica.
-
-Se crea automáticamente un banner de ejemplo:
+Banner de prueba actual:
 
 - **`rayquaza_hoenn` — Rayquaza: Cielos de Hoenn**
 - filtro de Generación 3;
-- Rayquaza destacado con multiplicador de peso `x6`;
-- el resto del pool se construye automáticamente con Pokémon válidos de esa generación.
+- Rayquaza destacado con multiplicador `x6`;
+- resto del pool generado automáticamente.
 
 ### Pity y datos persistentes
 
@@ -99,38 +98,39 @@ Se crea automáticamente un banner de ejemplo:
 - Garantía de Épico o superior configurable (por defecto 10 tiradas).
 - Soft pity legendario configurable (por defecto desde la tirada 60).
 - Hard pity Legendario o superior configurable (por defecto 90 tiradas).
-- El progreso se guarda inmediatamente después de una entrega exitosa y sobrevive reinicios.
+- El progreso se guarda inmediatamente después de una entrega confirmada.
 
 ### Economía y entrega
 
-- Backend de moneda `FREE` para pruebas.
+- Backend `FREE` para pruebas.
 - Backend `ITEM` para cobrar cualquier ítem configurable por ID.
-- Si la entrega del Pokémon falla después de retirar un ítem, el coste se devuelve al jugador.
-- La entrega usa la ruta de comandos de Cobblemon y captura el resultado real de ejecución antes de confirmar la transacción.
-- La integración directa con CobbleDollars queda preparada como adaptador futuro cuando fijemos la economía definitiva del servidor.
+- Si la entrega falla realmente después de retirar un ítem, el coste se devuelve.
+- La entrega usa los comandos de Cobblemon y valida parseo + resultado de ejecución.
+- Integración directa con CobbleDollars queda para cuando fijemos la economía definitiva.
 
-### Comandos de prueba de Fase 2
+### Comandos de prueba
 
 - `/emipokemon gacha catalog`
-- `/emipokemon gacha inspect <pokemon>` — muestra tier, generación, región, tipos, catch rate, BST y labels del catálogo.
+- `/emipokemon gacha inspect <pokemon>`
 - `/emipokemon gacha banners`
 - `/emipokemon gacha info <banner>`
 - `/emipokemon gacha pity <banner>`
-- `/emipokemon gacha simulate <banner>` — admin, no entrega ni consume.
-- `/emipokemon gacha pull <banner>` — admin durante la alpha; tirada real temporal para validar el backend.
-- `/emipokemon gacha reload` — admin; recarga banners y catálogo/overrides.
+- `/emipokemon gacha simulate <banner>` — admin; no entrega ni consume.
+- `/emipokemon gacha pull <banner>` — admin durante la alpha.
+- `/emipokemon gacha reload` — admin.
 
 ### Criterios para validar la Fase 2
 
 - [x] Compila en CI con la baseline real.
-- [ ] El catálogo detecta correctamente las especies de Cobbleverse y addons instalados.
-- [ ] Rayquaza aparece como `LEGENDARY`, Deoxys como `MYTHICAL` y los starters/powerhouse en su tier esperado.
-- [ ] `rayquaza_hoenn` solo genera un pool compatible con sus filtros de generación.
-- [ ] `simulate` funciona sin alterar pity ni entregar Pokémon.
-- [ ] `pull` entrega un Pokémon real correctamente.
-- [ ] Con equipo lleno, Cobblemon gestiona correctamente el destino del premio.
-- [ ] El pity aumenta, se reinicia al obtener el tier correspondiente y persiste tras reinicio.
-- [ ] Un coste `ITEM` se retira y se reembolsa si la entrega falla.
+- [x] El catálogo detecta correctamente especies de Cobbleverse y addons instalados.
+- [x] Rayquaza aparece como `LEGENDARY`, Deoxys como `MYTHICAL` y starters/powerhouse en su tier esperado.
+- [x] `rayquaza_hoenn` genera un pool compatible con Gen 3.
+- [x] `pull` entrega Pokémon reales.
+- [x] Con equipo lleno, Cobblemon manda el premio al PC.
+- [ ] Revalidar en `alpha.2` que una entrega correcta confirma la tirada y aumenta pity.
+- [ ] Confirmar que `simulate` no altera pity ni entrega Pokémon.
+- [ ] Confirmar persistencia del pity tras reinicio.
+- [ ] Probar una transacción `ITEM` y su reembolso solo ante fallo real.
 
 ## Fase 4 — Hub + Centro Pokémon + Poké Mart
 
