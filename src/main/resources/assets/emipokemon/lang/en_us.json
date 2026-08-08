@@ -1,4 +1,1 @@
-{
-  "emipokemon.command.reload.ok": "Emipokemon configuration reloaded.",
-  "emipokemon.command.permission": "You do not have permission to use this command."
-}
+{"item.emipokemon.gacha_ticket":"Gacha Ticket","item.emipokemon.emi_special_banner_ticket":"Emi Special Banner Ticket","block.emipokemon.standard_gacha_machine":"Emipokemon Gacha Machine","block.emipokemon.gacha_machine_top":"Gacha Machine Upper Part"}
