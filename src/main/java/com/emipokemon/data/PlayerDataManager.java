@@ -28,12 +28,24 @@ public final class PlayerDataManager {
     }
 
     public void load(UUID playerId) {
-        getOrLoad(playerId).touch();
+        PlayerData data = getOrLoad(playerId);
+        data.normalize();
+        data.touch();
+    }
+
+    public void saveNow(UUID playerId) {
+        PlayerData data = cache.get(playerId);
+        if (data != null) {
+            data.normalize();
+            data.touch();
+            writeSafely(data);
+        }
     }
 
     public void saveAndUnload(UUID playerId) {
         PlayerData data = cache.remove(playerId);
         if (data != null) {
+            data.normalize();
             data.touch();
             writeSafely(data);
         }
@@ -41,6 +53,7 @@ public final class PlayerDataManager {
 
     public void saveAll() {
         cache.values().forEach(data -> {
+            data.normalize();
             data.touch();
             writeSafely(data);
         });
@@ -57,6 +70,7 @@ public final class PlayerDataManager {
                 PlayerData data = GSON.fromJson(reader, PlayerData.class);
                 if (data != null) {
                     data.playerId = playerId;
+                    data.normalize();
                     return data;
                 }
             } catch (Exception exception) {
