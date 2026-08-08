@@ -112,6 +112,7 @@ Se crea automáticamente un banner de ejemplo:
 ### Comandos de prueba de Fase 2
 
 - `/emipokemon gacha catalog`
+- `/emipokemon gacha inspect <pokemon>` — muestra tier, generación, región, tipos, catch rate, BST y labels del catálogo.
 - `/emipokemon gacha banners`
 - `/emipokemon gacha info <banner>`
 - `/emipokemon gacha pity <banner>`
