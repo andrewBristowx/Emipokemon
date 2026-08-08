@@ -26,6 +26,7 @@ public final class GachaService {
     private final GachaCurrencyService currency = new GachaCurrencyService();
     private final CobblemonRewardService rewards = new CobblemonRewardService();
     private final Map<UUID, Object> playerLocks = new ConcurrentHashMap<>();
+    private final Map<UUID, PreparedPull> preparedPulls = new ConcurrentHashMap<>();
 
     public GachaService(PokemonCatalogService catalog, BannerManager banners, PlayerDataManager playerData) {
         this.catalog = catalog;
@@ -50,29 +51,106 @@ public final class GachaService {
             String bannerId,
             BannerDefinition.Currency currencyOverride
     ) {
-        BannerDefinition banner = banners.get(bannerId);
-        if (banner == null || !banner.enabled) return PullOutcome.failure("Banner no encontrado o desactivado: " + bannerId);
-        if (catalog.size() == 0) return PullOutcome.failure("El catalogo Pokemon aun no esta disponible.");
+        PrepareOutcome preparation = preparePull(player, bannerId);
+        if (!preparation.success()) return PullOutcome.failure(preparation.error());
+        return commitPreparedPull(player, preparation.preparedPull(), currencyOverride);
+    }
 
-        Object lock = playerLocks.computeIfAbsent(player.getUuid(), ignored -> new Object());
+    /**
+     * Decides the result server-side without consuming currency, delivering a Pokemon or changing pity.
+     * While the reservation exists, that player cannot start another gacha transaction.
+     */
+    public PrepareOutcome preparePull(ServerPlayerEntity player, String bannerId) {
+        BannerDefinition banner = banners.get(bannerId);
+        if (banner == null || !banner.enabled) {
+            return PrepareOutcome.failure("Banner no encontrado o desactivado: " + bannerId);
+        }
+        if (catalog.size() == 0) {
+            return PrepareOutcome.failure("El catalogo Pokemon aun no esta disponible.");
+        }
+
+        UUID playerId = player.getUuid();
+        Object lock = playerLocks.computeIfAbsent(playerId, ignored -> new Object());
         synchronized (lock) {
-            PlayerData data = playerData.getOrLoad(player.getUuid());
+            if (preparedPulls.containsKey(playerId)) {
+                return PrepareOutcome.failure("Ya tienes una tirada de gacha en proceso.");
+            }
+
+            PlayerData data = playerData.getOrLoad(playerId);
             GachaProgress progress = data.gacha(banner.id);
             GachaRollResult result = roll(banner, progress);
-            if (result == null) return PullOutcome.failure("El banner no tiene Pokemon validos para sus filtros/tiers.");
+            if (result == null) {
+                return PrepareOutcome.failure("El banner no tiene Pokemon validos para sus filtros/tiers.");
+            }
+
+            PreparedPull prepared = new PreparedPull(
+                    UUID.randomUUID(),
+                    playerId,
+                    banner.id,
+                    result
+            );
+            preparedPulls.put(playerId, prepared);
+            return PrepareOutcome.success(prepared);
+        }
+    }
+
+    /**
+     * Commits a previously prepared result. Currency is consumed here, immediately before delivery.
+     * This allows a physical machine to animate first without risking a ticket during a restart.
+     */
+    public PullOutcome commitPreparedPull(
+            ServerPlayerEntity player,
+            PreparedPull prepared,
+            BannerDefinition.Currency currencyOverride
+    ) {
+        if (prepared == null || !player.getUuid().equals(prepared.playerUuid())) {
+            return PullOutcome.failure("La reserva de gacha no pertenece a este jugador.");
+        }
+
+        UUID playerId = player.getUuid();
+        Object lock = playerLocks.computeIfAbsent(playerId, ignored -> new Object());
+        synchronized (lock) {
+            PreparedPull active = preparedPulls.get(playerId);
+            if (active == null || !active.transactionId().equals(prepared.transactionId())) {
+                return PullOutcome.failure("La reserva de gacha ya no esta activa.");
+            }
+
+            BannerDefinition banner = banners.get(prepared.bannerId());
+            if (banner == null || !banner.enabled) {
+                preparedPulls.remove(playerId, active);
+                return PullOutcome.failure("El banner fue desactivado antes de completar la tirada.");
+            }
 
             BannerDefinition.Currency effectiveCurrency = currencyOverride == null ? banner.currency : currencyOverride;
             GachaCurrencyService.Result withdrawal = currency.withdraw(player, effectiveCurrency);
-            if (!withdrawal.success()) return PullOutcome.failure(withdrawal.error());
+            if (!withdrawal.success()) {
+                preparedPulls.remove(playerId, active);
+                return PullOutcome.failure(withdrawal.error());
+            }
 
-            if (!rewards.deliver(player, result)) {
+            if (!rewards.deliver(player, prepared.result())) {
                 currency.refund(player, withdrawal);
+                preparedPulls.remove(playerId, active);
                 return PullOutcome.failure("No se pudo entregar el Pokemon; la moneda fue devuelta.");
             }
 
-            progress.record(result.tier(), result.pokemon().speciesId());
-            playerData.saveNow(player.getUuid());
-            return PullOutcome.success(result);
+            PlayerData data = playerData.getOrLoad(playerId);
+            GachaProgress progress = data.gacha(banner.id);
+            progress.record(prepared.result().tier(), prepared.result().pokemon().speciesId());
+            playerData.saveNow(playerId);
+            preparedPulls.remove(playerId, active);
+            return PullOutcome.success(prepared.result());
+        }
+    }
+
+    public void cancelPreparedPull(UUID playerUuid, UUID transactionId) {
+        if (playerUuid == null || transactionId == null) return;
+        Object lock = playerLocks.computeIfAbsent(playerUuid, ignored -> new Object());
+        synchronized (lock) {
+            PreparedPull active = preparedPulls.get(playerUuid);
+            if (active != null && active.transactionId().equals(transactionId)) {
+                preparedPulls.remove(playerUuid, active);
+            }
         }
     }
 
@@ -188,6 +266,24 @@ public final class GachaService {
             if (roll < cursor) return entry;
         }
         return candidates.get(candidates.size() - 1);
+    }
+
+    public record PreparedPull(
+            UUID transactionId,
+            UUID playerUuid,
+            String bannerId,
+            GachaRollResult result
+    ) {
+    }
+
+    public record PrepareOutcome(boolean success, String error, PreparedPull preparedPull) {
+        public static PrepareOutcome success(PreparedPull preparedPull) {
+            return new PrepareOutcome(true, null, preparedPull);
+        }
+
+        public static PrepareOutcome failure(String error) {
+            return new PrepareOutcome(false, error, null);
+        }
     }
 
     public record PullOutcome(boolean success, String error, GachaRollResult result) {
