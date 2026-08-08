@@ -3,8 +3,8 @@
 ## Estado actual
 
 - **Fase 1 — Core: VALIDADA ✅**
-- **Fase 2 — Gacha backend: IMPLEMENTADA EN DESARROLLO 🧪**
-- **Siguiente validación:** compilar y probar Fase 2 dentro del pack real de Cobbleverse.
+- **Fase 2 — Gacha backend: IMPLEMENTADA Y COMPILA ✅ / PENDIENTE VALIDACIÓN REAL 🧪**
+- **Siguiente validación:** probar Fase 2 dentro del pack real de Cobbleverse.
 - Validación real de Fase 1 realizada en Cobbleverse 1.21.1 con Cobblemon 1.7.3.
 - Persistencia confirmada tras reconexión y tras reinicio completo del servidor (`debugCounter` 1 → 2 → 3).
 
@@ -23,7 +23,7 @@
 ## Fases
 
 1. **Core — VALIDADA ✅** — Base Fabric/Cobblemon/GeckoLib, configuración, datos, registro, comandos admin y validación de carga.
-2. **Gacha backend — IMPLEMENTADA 🧪** — Catálogo automático de rarezas, filtros, tiers, pools, pesos, probabilidades, pity, economía básica y entrega segura de Pokémon.
+2. **Gacha backend — IMPLEMENTADA / COMPILA ✅ / PENDIENTE PRUEBA REAL 🧪** — Catálogo automático de rarezas, filtros, tiers, pools, pesos, probabilidades, pity, economía básica y entrega segura de Pokémon.
 3. **Primer Gacha 3D** — Máquina, cápsulas, modelos, texturas, animaciones y sincronización servidor-cliente.
 4. **Hub + Centro Pokémon + Poké Mart** — Sistema de plantilla modular, plaza central, spawn, Centro Pokémon funcional, tienda configurable y espacios reservados para Gacha/Casino/Eventos.
 5. **Banners** — Banners permanentes/evento, rate-up avanzado, pity por banner y rotación de contenido.
@@ -52,7 +52,9 @@ Pruebas completadas en el pack real:
 
 ### Estado
 
-**IMPLEMENTADA EN RAMA DE DESARROLLO — pendiente validación real**
+**IMPLEMENTADA Y COMPILA EN CI — pendiente validación dentro del servidor real**
+
+Build de desarrollo: **Emipokemon 0.2.0-alpha.1**.
 
 ### Catálogo de Pokémon y rarezas
 
@@ -104,7 +106,7 @@ Se crea automáticamente un banner de ejemplo:
 - Backend de moneda `FREE` para pruebas.
 - Backend `ITEM` para cobrar cualquier ítem configurable por ID.
 - Si la entrega del Pokémon falla después de retirar un ítem, el coste se devuelve al jugador.
-- La entrega usa la ruta de comandos oficial de Cobblemon para que el Pokémon se gestione mediante sus propios sistemas de almacenamiento.
+- La entrega usa la ruta de comandos de Cobblemon y captura el resultado real de ejecución antes de confirmar la transacción.
 - La integración directa con CobbleDollars queda preparada como adaptador futuro cuando fijemos la economía definitiva del servidor.
 
 ### Comandos de prueba de Fase 2
@@ -114,12 +116,12 @@ Se crea automáticamente un banner de ejemplo:
 - `/emipokemon gacha info <banner>`
 - `/emipokemon gacha pity <banner>`
 - `/emipokemon gacha simulate <banner>` — admin, no entrega ni consume.
-- `/emipokemon gacha pull <banner>` — tirada real temporal para validar el backend antes de la máquina 3D.
-- `/emipokemon gacha reload` — recarga banners y catálogo/overrides.
+- `/emipokemon gacha pull <banner>` — admin durante la alpha; tirada real temporal para validar el backend.
+- `/emipokemon gacha reload` — admin; recarga banners y catálogo/overrides.
 
 ### Criterios para validar la Fase 2
 
-- [ ] Compila en CI con la baseline real.
+- [x] Compila en CI con la baseline real.
 - [ ] El catálogo detecta correctamente las especies de Cobbleverse y addons instalados.
 - [ ] Rayquaza aparece como `LEGENDARY`, Deoxys como `MYTHICAL` y los starters/powerhouse en su tier esperado.
 - [ ] `rayquaza_hoenn` solo genera un pool compatible con sus filtros de generación.
