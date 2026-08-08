@@ -5,9 +5,11 @@ on:
     branches:
       - main
       - agent/phase-1-core
+      - agent/phase-2-gacha-dev2
   pull_request:
     branches:
       - main
+      - agent/phase-1-core
 
 jobs:
   build:
