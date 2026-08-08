@@ -1,7 +1,6 @@
 package com.emipokemon.gacha.machine;
 
 import com.emipokemon.Emipokemon;
-import com.emipokemon.gacha.GachaRollResult;
 import com.emipokemon.gacha.GachaService;
 import com.emipokemon.gacha.GachaTier;
 import com.emipokemon.gacha.banner.BannerDefinition;
@@ -9,6 +8,7 @@ import com.emipokemon.registry.ModRegistries;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.nbt.NbtCompound;
+import net.minecraft.network.listener.ClientPlayPacketListener;
 import net.minecraft.network.packet.Packet;
 import net.minecraft.network.packet.s2c.play.BlockEntityUpdateS2CPacket;
 import net.minecraft.registry.RegistryWrapper;
@@ -164,9 +164,7 @@ public final class GachaMachineBlockEntity extends BlockEntity implements GeoBlo
                 machine.activePlayerUuid = null;
                 machine.phaseTicks = 0;
             }
-            case IDLE -> {
-                machine.phaseTicks = 0;
-            }
+            case IDLE -> machine.phaseTicks = 0;
         }
         machine.markAndSync();
     }
@@ -198,15 +196,9 @@ public final class GachaMachineBlockEntity extends BlockEntity implements GeoBlo
             machineState = GachaMachineState.IDLE;
         }
         phaseTicks = Math.max(0, nbt.getInt("PhaseTicks"));
-        if (nbt.contains("ResultTier")) {
-            resultTier = GachaTier.parse(nbt.getString("ResultTier"), null);
-        } else {
-            resultTier = null;
-        }
+        resultTier = nbt.contains("ResultTier") ? GachaTier.parse(nbt.getString("ResultTier"), null) : null;
         activePlayerUuid = nbt.containsUuid("ActivePlayer") ? nbt.getUuid("ActivePlayer") : null;
 
-        // An interrupted animation is visual-only in this alpha. The backend transaction has already
-        // committed or rolled back synchronously, so a loaded machine safely returns to idle.
         if (machineState.isBusy() && world == null) {
             machineState = GachaMachineState.IDLE;
             phaseTicks = 0;
@@ -216,7 +208,7 @@ public final class GachaMachineBlockEntity extends BlockEntity implements GeoBlo
     }
 
     @Override
-    public Packet<?> toUpdatePacket() {
+    public Packet<ClientPlayPacketListener> toUpdatePacket() {
         return BlockEntityUpdateS2CPacket.create(this);
     }
 
