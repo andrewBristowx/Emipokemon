@@ -103,9 +103,14 @@ public final class BannerDefinition {
 
     public double featuredMultiplier(String speciesId) {
         if (speciesId == null) return 1.0;
-        String full = speciesId.toLowerCase(Locale.ROOT);
-        String path = full.contains(":") ? full.substring(full.indexOf(':') + 1) : full;
-        return Math.max(1.0, featuredSpecies.getOrDefault(full, featuredSpecies.getOrDefault(path, 1.0)));
+        String wanted = normalizeSpeciesKey(speciesId);
+        double multiplier = 1.0;
+        for (Map.Entry<String, Double> entry : featuredSpecies.entrySet()) {
+            if (normalizeSpeciesKey(entry.getKey()).equals(wanted)) {
+                multiplier = Math.max(multiplier, entry.getValue());
+            }
+        }
+        return Math.max(1.0, multiplier);
     }
 
     public boolean allows(PokemonCatalogEntry entry) {
@@ -120,9 +125,14 @@ public final class BannerDefinition {
     }
 
     private boolean isExcluded(String speciesId) {
-        String full = speciesId.toLowerCase(Locale.ROOT);
-        String path = full.contains(":") ? full.substring(full.indexOf(':') + 1) : full;
-        return excludedSpecies.stream().map(String::toLowerCase).anyMatch(value -> value.equals(full) || value.equals(path));
+        String wanted = normalizeSpeciesKey(speciesId);
+        return excludedSpecies.stream().anyMatch(value -> normalizeSpeciesKey(value).equals(wanted));
+    }
+
+    private String normalizeSpeciesKey(String value) {
+        String key = value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+        if (key.startsWith("cobblemon:")) key = key.substring("cobblemon:".length());
+        return key;
     }
 
     public static final class Currency {
