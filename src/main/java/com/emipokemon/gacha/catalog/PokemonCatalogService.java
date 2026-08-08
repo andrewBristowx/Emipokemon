@@ -50,8 +50,7 @@ public final class PokemonCatalogService {
 
     public synchronized PokemonCatalogEntry get(String speciesId) {
         if (speciesId == null) return null;
-        String normalized = normalizeSpeciesId(speciesId);
-        return entries.get(normalized);
+        return entries.get(normalizeSpeciesId(speciesId));
     }
 
     public synchronized List<PokemonCatalogEntry> all() {
@@ -74,7 +73,9 @@ public final class PokemonCatalogService {
     }
 
     private PokemonCatalogEntry fromSpecies(Species species) {
-        String id = species.getResourceIdentifier().toString().toLowerCase(Locale.ROOT);
+        // showdownId is mapping-neutral (String), unlike resourceIdentifier whose Minecraft
+        // ResourceLocation type differs between Cobblemon's Mojang mappings and our Yarn workspace.
+        String id = normalizeSpeciesId(species.showdownId());
         Set<String> labels = new LinkedHashSet<>();
         species.getLabels().forEach(label -> labels.add(label.toLowerCase(Locale.ROOT)));
 
@@ -88,7 +89,7 @@ public final class PokemonCatalogService {
         int bst = species.getBaseStats().values().stream().mapToInt(Integer::intValue).sum();
         GachaTier tier = classify(labels, bst, species.getCatchRate());
         String override = overrides.get(id);
-        if (override == null) override = overrides.get(species.getResourceIdentifier().getPath().toLowerCase(Locale.ROOT));
+        if (override == null) override = overrides.get(species.getName().toLowerCase(Locale.ROOT));
         tier = GachaTier.parse(override, tier);
 
         return new PokemonCatalogEntry(
@@ -153,7 +154,8 @@ public final class PokemonCatalogService {
 
     private String normalizeSpeciesId(String speciesId) {
         String value = speciesId.trim().toLowerCase(Locale.ROOT);
-        return value.contains(":") ? value : "cobblemon:" + value;
+        if (value.startsWith("cobblemon:")) value = value.substring("cobblemon:".length());
+        return value;
     }
 
     private void loadOverrides() {
