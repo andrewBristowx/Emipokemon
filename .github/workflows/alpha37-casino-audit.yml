@@ -1,8 +1,8 @@
 name: alpha37-casino-audit
 
 on:
-  push:
-    branches: [release/0.4.0-alpha.37]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -47,6 +47,8 @@ jobs:
           grep -RIn -E 'casino_.*\.png|textures/(block|entity).*casino|Identifier.*casino' src/client/java src/main/java src/main/resources || true
           echo '=== GENERATED PNG FILES ==='
           find src/main/resources/assets/emipokemon -type f -name 'casino_*.png' -print -exec file {} \; -exec sha256sum {} \;
+          echo '=== GEO UV DECLARATIONS ==='
+          grep -RIn -E 'texture_width|texture_height|"uv"' src/main/resources/assets/emipokemon/geo/casino_*.geo.json | head -n 300 || true
       - name: Audit casino screen rendering
         shell: bash
         working-directory: work
