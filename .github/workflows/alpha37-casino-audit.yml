@@ -1,0 +1,56 @@
+name: alpha37-casino-audit
+
+on:
+  push:
+    branches: [release/0.4.0-alpha.37]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download alpha.27 baseline
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 3 --retry-delay 2 'https://drive.usercontent.google.com/download?id=1hW1-TH2UK6c2BIwZae7ux6zSM3opL10N&export=download&confirm=t' -o alpha27-source.zip
+          echo 'a7e5545668760f84d036ee017622d32d9b8fa0ffe4b77cfdae10d40c820abf4b  alpha27-source.zip' | sha256sum -c -
+          rm -rf work ci-history && mkdir work ci-history
+          unzip -q alpha27-source.zip -d work
+      - name: Reconstruct alpha.36
+        shell: bash
+        run: |
+          set -euxo pipefail
+          base34='https://raw.githubusercontent.com/andrewBristowx/Emipokemon/2494bdfcbaa1b282962178d67d82ad136b404811/ci'
+          for f in alpha29_apply.py alpha30_apply.py alpha31_apply.py alpha31_compile_fix.py alpha32_client_path.py alpha32_apply.py alpha33_apply.py alpha34_apply.py alpha34_test_fix.py; do curl -fL --retry 3 "$base34/$f" -o "ci-history/$f"; done
+          curl -fL --retry 3 'https://raw.githubusercontent.com/andrewBristowx/Emipokemon/56eca300953a194b13596c17f064430c7f383ded/ci/alpha35_apply.py' -o ci-history/alpha35_apply.py
+          cd work
+          for f in alpha29_apply.py alpha30_apply.py alpha31_apply.py alpha31_compile_fix.py alpha32_client_path.py alpha32_apply.py; do python3 "$GITHUB_WORKSPACE/ci-history/$f"; done
+          rm -f src/client/java/com/emipokemon/EmipokemonClient.java
+          for f in alpha33_apply.py alpha34_apply.py alpha34_test_fix.py alpha35_apply.py; do python3 "$GITHUB_WORKSPACE/ci-history/$f"; done
+          python3 "$GITHUB_WORKSPACE/ci/alpha36_server.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha36_client.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha36_visual.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha36_tests.py"
+      - name: Audit GeckoLib texture routing and renderer
+        shell: bash
+        working-directory: work
+        run: |
+          set -euo pipefail
+          echo '=== CASINO MODEL / RENDERER CLASSES ==='
+          grep -RIn -A220 -B20 -E 'class CasinoMachine(Model|Renderer)|getTextureResource|getModelResource|getAnimationResource' src/client/java src/main/java || true
+          echo '=== ALL CASINO TEXTURE REFERENCES ==='
+          grep -RIn -E 'casino_.*\.png|textures/(block|entity).*casino|Identifier.*casino' src/client/java src/main/java src/main/resources || true
+          echo '=== GENERATED PNG FILES ==='
+          find src/main/resources/assets/emipokemon -type f -name 'casino_*.png' -print -exec file {} \; -exec sha256sum {} \;
+      - name: Audit casino screen rendering
+        shell: bash
+        working-directory: work
+        run: |
+          set -euo pipefail
+          sed -n '1,380p' src/client/java/com/emipokemon/client/casino/CasinoScreen.java
+          grep -RIn -E 'blur|renderBackground|setShader|scale\(|MatrixStack|Framebuffer|post' src/client/java/com/emipokemon/client/casino src/client/java/com/emipokemon/client || true
