@@ -78,6 +78,21 @@ jobs:
             sed -n '1,420p' "$f"
           done
 
+      - name: Print progression and casino config API
+        shell: bash
+        working-directory: work
+        run: |
+          set -euo pipefail
+          echo '=== PROGRESSION SERVICE MATCHES ==='
+          grep -RIlE 'class .*Progression|boolean spend\(|void refund\(|long balance\(' src/main/java | sort | while read -r f; do
+            echo "===== API FILE: $f ====="
+            sed -n '1,420p' "$f"
+          done
+          echo '=== CASINO SETTINGS ==='
+          grep -RIn -A140 -B10 'class CasinoSettings' src/main/java/com/emipokemon/config/EmipokemonConfig.java || true
+          echo '=== CASINO ANIMATION ==='
+          cat src/main/resources/assets/emipokemon/animations/casino.animation.json
+
       - name: Print casino geo json files
         shell: bash
         working-directory: work
