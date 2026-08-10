@@ -27,7 +27,7 @@ jobs:
         run: |
           set -euxo pipefail
           curl -fL --retry 3 --retry-delay 2 \
-            'https://drive.usercontent.google.com/download?id=1WbufcE_h_3zL_k1VPRn1gz9CEwvrDVqr&export=download&confirm=t' \
+            'https://drive.usercontent.google.com/download?id=1hW1-TH2UK6c2BIwZae7ux6zSM3opL10N&export=download&confirm=t' \
             -o alpha27-source.zip
           echo 'a7e5545668760f84d036ee017622d32d9b8fa0ffe4b77cfdae10d40c820abf4b  alpha27-source.zip' | sha256sum -c -
           rm -rf work
