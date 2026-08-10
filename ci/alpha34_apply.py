@@ -41,12 +41,12 @@ if 'TextDisplayHologramMixin' not in obj.get('client',[]):
     obj.setdefault('client',[]).append('TextDisplayHologramMixin')
 write(p,json.dumps(obj,indent=2,ensure_ascii=False)+'\n')
 
-# Update source version test and retire the historical alpha.31 assertion that required the
-# renderer mixin to remain disabled. Add explicit anti-flicker coverage.
+# Update source version test and retire historical expectations from alpha.29/31.
 p='src/test/java/com/emipokemon/visual/VisualRefreshRegressionTest.java'; s=read(p)
 s=s.replace('alpha33VersionIsConsistentInSource','alpha34VersionIsConsistentInSource')
 s=s.replace('0.4.0-alpha.33','0.4.0-alpha.34')
 s=s.replace('        assertFalse(clientMixins.contains("TextDisplayHologramMixin"));','        assertTrue(clientMixins.contains("TextDisplayHologramMixin"));')
+s=s.replace('        assertTrue(mixin.contains("HologramTextResolver.isEmipokemonDisplay(entity, data.text())"));','        assertTrue(mixin.contains("HologramStreamotesClientService.resolve(data.text())"));')
 insert='''\n    @Test\n    void alpha34ResolvesEmotesBeforeFirstRenderedFrame() throws Exception {\n        String mixin = source("client/java/com/emipokemon/client/mixin/TextDisplayHologramMixin.java");\n        String clientMixins = source("client/resources/emipokemon.client.mixins.json");\n        String streamotes = source("client/java/com/emipokemon/client/emote/HologramStreamotesClientService.java");\n        assertTrue(clientMixins.contains("TextDisplayHologramMixin"));\n        assertTrue(mixin.contains("HologramStreamotesClientService.resolve(data.text())"));\n        assertTrue(mixin.contains("data.flags() & ~0x02"));\n        assertTrue(streamotes.contains("public static Text resolve(Text original)"));\n        assertTrue(streamotes.contains("END_CLIENT_TICK"));\n    }\n'''
 pos=s.rfind('\n}')
 if pos < 0: raise SystemExit('missing alpha34 patch anchor: test class closing brace')
