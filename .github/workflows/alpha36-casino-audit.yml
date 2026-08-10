@@ -15,91 +15,28 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Download exact alpha.27 source archive
+      - name: Download and reconstruct alpha.35
         shell: bash
         run: |
           set -euxo pipefail
-          curl -fL --retry 3 --retry-delay 2 \
-            'https://drive.usercontent.google.com/download?id=1hW1-TH2UK6c2BIwZae7ux6zSM3opL10N&export=download&confirm=t' \
-            -o alpha27-source.zip
+          curl -fL --retry 3 --retry-delay 2 'https://drive.usercontent.google.com/download?id=1hW1-TH2UK6c2BIwZae7ux6zSM3opL10N&export=download&confirm=t' -o alpha27-source.zip
           echo 'a7e5545668760f84d036ee017622d32d9b8fa0ffe4b77cfdae10d40c820abf4b  alpha27-source.zip' | sha256sum -c -
-          rm -rf work ci-history
-          mkdir work ci-history
+          rm -rf work ci-history && mkdir work ci-history
           unzip -q alpha27-source.zip -d work
-
-      - name: Fetch exact alpha.29-alpha.35 transforms
-        shell: bash
-        run: |
-          set -euxo pipefail
           base34='https://raw.githubusercontent.com/andrewBristowx/Emipokemon/2494bdfcbaa1b282962178d67d82ad136b404811/ci'
-          for f in alpha29_apply.py alpha30_apply.py alpha31_apply.py alpha31_compile_fix.py alpha32_client_path.py alpha32_apply.py alpha33_apply.py alpha34_apply.py alpha34_test_fix.py; do
-            curl -fL --retry 3 "$base34/$f" -o "ci-history/$f"
-          done
+          for f in alpha29_apply.py alpha30_apply.py alpha31_apply.py alpha31_compile_fix.py alpha32_client_path.py alpha32_apply.py alpha33_apply.py alpha34_apply.py alpha34_test_fix.py; do curl -fL --retry 3 "$base34/$f" -o "ci-history/$f"; done
           curl -fL --retry 3 'https://raw.githubusercontent.com/andrewBristowx/Emipokemon/56eca300953a194b13596c17f064430c7f383ded/ci/alpha35_apply.py' -o ci-history/alpha35_apply.py
-
-      - name: Reconstruct alpha.35 source
-        shell: bash
-        working-directory: work
-        run: |
-          set -euxo pipefail
-          python3 "$GITHUB_WORKSPACE/ci-history/alpha29_apply.py"
-          python3 "$GITHUB_WORKSPACE/ci-history/alpha30_apply.py"
-          python3 "$GITHUB_WORKSPACE/ci-history/alpha31_apply.py"
-          python3 "$GITHUB_WORKSPACE/ci-history/alpha31_compile_fix.py"
-          python3 "$GITHUB_WORKSPACE/ci-history/alpha32_client_path.py"
-          python3 "$GITHUB_WORKSPACE/ci-history/alpha32_apply.py"
+          cd work
+          for f in alpha29_apply.py alpha30_apply.py alpha31_apply.py alpha31_compile_fix.py alpha32_client_path.py alpha32_apply.py; do python3 "$GITHUB_WORKSPACE/ci-history/$f"; done
           rm -f src/client/java/com/emipokemon/EmipokemonClient.java
-          python3 "$GITHUB_WORKSPACE/ci-history/alpha33_apply.py"
-          python3 "$GITHUB_WORKSPACE/ci-history/alpha34_apply.py"
-          python3 "$GITHUB_WORKSPACE/ci-history/alpha34_test_fix.py"
-          python3 "$GITHUB_WORKSPACE/ci-history/alpha35_apply.py"
-
-      - name: Print casino source inventory
+          for f in alpha33_apply.py alpha34_apply.py alpha34_test_fix.py alpha35_apply.py; do python3 "$GITHUB_WORKSPACE/ci-history/$f"; done
+      - name: Print exact economy mutation internals
         shell: bash
         working-directory: work
         run: |
           set -euo pipefail
-          echo '=== CASINO FILES ==='
-          find src -type f | sort | grep -Ei 'casino|roulette|ruleta|blackjack|poker|slot|tragam|ticket|michicoin|dice|dado' || true
-          echo '=== CASINO JAVA DECLARATIONS ==='
-          grep -RInE 'class .*Casino|class .*Blackjack|class .*Poker|class .*Roulette|CasinoService|CasinoAction|CasinoMachine|BLACKJACK|POKER|ROULETTE|DICE|SLOT|FICHAS|TICKETS' src/main src/client 2>/dev/null | head -n 1200 || true
-          echo '=== GEO RESOURCES ==='
-          find src -type f \( -name '*.geo.json' -o -name '*.animation.json' \) -print | sort | head -n 500
-
-      - name: Print core casino Java files
-        shell: bash
-        working-directory: work
-        run: |
-          set -euo pipefail
-          files=$(find src -type f -name '*.java' | grep -Ei 'casino' | sort)
-          for f in $files; do
-            echo "===== FILE: $f ====="
-            sed -n '1,420p' "$f"
-          done
-
-      - name: Print progression and casino config API
-        shell: bash
-        working-directory: work
-        run: |
-          set -euo pipefail
-          echo '=== PROGRESSION SERVICE MATCHES ==='
-          grep -RIlE 'class .*Progression|boolean spend\(|void refund\(|long balance\(' src/main/java | sort | while read -r f; do
-            echo "===== API FILE: $f ====="
-            sed -n '1,420p' "$f"
-          done
-          echo '=== CASINO SETTINGS ==='
-          grep -RIn -A140 -B10 'class CasinoSettings' src/main/java/com/emipokemon/config/EmipokemonConfig.java || true
-          echo '=== CASINO ANIMATION ==='
-          cat src/main/resources/assets/emipokemon/animations/casino.animation.json
-
-      - name: Print casino geo json files
-        shell: bash
-        working-directory: work
-        run: |
-          set -euo pipefail
-          files=$(find src -type f -name '*.geo.json' | grep -Ei 'casino|slot|chip|ticket|roulette|poker|blackjack|dice|trag|ficha|ruleta|dado' | sort)
-          for f in $files; do
-            echo "===== GEO: $f ====="
-            cat "$f"
-          done
+          f=src/main/java/com/emipokemon/progress/ProgressionService.java
+          grep -n -A100 -B20 'private long credit' "$f" || true
+          grep -n -A100 -B20 'private boolean debit' "$f" || true
+          grep -n -A70 -B20 'void playerLeft' "$f" || true
+          grep -RIn 'ServerPlayConnectionEvents' src/main/java || true
