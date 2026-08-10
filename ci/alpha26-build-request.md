@@ -7,4 +7,4 @@ SHA-256: `BF8AB304564BDFB9BEEF78A5F3DDC76C8A17964D82D64828A185B438DD2BA798`.
 
 El workflow debe compilar con Temurin Java 21 mediante `./gradlew clean test build --no-daemon --stacktrace` y no implica validación visual de Cobbleverse.
 
-Sincronización CI: 2026-08-10T02:30Z.
+Sincronización CI: 2026-08-10T02:33Z — verificación corregida para `EntityType.TEXT_DISPLAY`.
