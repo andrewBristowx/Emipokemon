@@ -2,9 +2,9 @@
 
 Esta rama existe para disparar la compilación reproducible de alpha.26 en GitHub Actions.
 
-Fuente autoritativa usada por CI: `Emipokemon-0.4.0-alpha.26-source.zip`.
-SHA-256: `BF8AB304564BDFB9BEEF78A5F3DDC76C8A17964D82D64828A185B438DD2BA798`.
+Fuente CI actual: `Emipokemon-0.4.0-alpha.26-source-ci2.zip`.
+SHA-256: `977F1FF882B55DA2DA9D41172900524C88A7158652204AC2A2CFB6E6DA293BFC`.
 
-El workflow debe compilar con Temurin Java 21 mediante `./gradlew clean test build --no-daemon --stacktrace` y no implica validación visual de Cobbleverse.
+Corrección CI2: `HologramService.findLoaded` conserva el tipo wildcard devuelto por `getEntitiesByType` mediante `var`, evitando la asignación inválida a `List<TextDisplayEntity>`.
 
-Sincronización CI: 2026-08-10T02:33Z — verificación corregida para `EntityType.TEXT_DISPLAY`.
+El workflow compila con Temurin Java 21 mediante `./gradlew clean test build --no-daemon --stacktrace` y no implica validación visual de Cobbleverse.
