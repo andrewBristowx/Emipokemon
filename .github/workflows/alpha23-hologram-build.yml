@@ -41,33 +41,26 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           root = Path('work')
-
           p = root / 'gradle.properties'
-          s = p.read_text()
-          assert 'mod_version=0.4.0-alpha.22' in s
+          s = p.read_text(); assert 'mod_version=0.4.0-alpha.22' in s
           p.write_text(s.replace('mod_version=0.4.0-alpha.22', 'mod_version=0.4.0-alpha.23'))
 
           p = root / 'src/main/java/com/emipokemon/hologram/HologramEntity.java'
           s = p.read_text()
           anchor = '        setInvulnerable(true);\n        setNoGravity(true);\n'
           replacement = anchor + '        // Renderer lifts the text 2.35 blocks above this tiny anchor.\n        // Do not let vanilla frustum culling discard the anchor first.\n        ignoreCameraFrustum = true;\n'
-          assert anchor in s
-          p.write_text(s.replace(anchor, replacement, 1))
+          assert anchor in s; p.write_text(s.replace(anchor, replacement, 1))
 
           p = root / 'src/client/java/com/emipokemon/client/emote/HologramTextResolver.java'
           s = p.read_text()
           old = '''        String resolved = placeholders(hologram.hologramText().getString(), hologram);\n        refreshEmotes();\n        Matcher matcher = EMOTE.matcher(resolved);\n        MutableText result = Text.empty();\n'''
           new = '''        String resolved = placeholders(hologram.hologramText().getString(), hologram);\n        Matcher matcher = EMOTE.matcher(resolved);\n        // Plain text/placeholders must work without touching optional Streamotes.\n        if (!matcher.find()) return Text.literal(resolved);\n        matcher.reset();\n        refreshEmotes();\n        MutableText result = Text.empty();\n'''
-          assert old in s
-          p.write_text(s.replace(old, new, 1))
+          assert old in s; p.write_text(s.replace(old, new, 1))
 
           p = root / 'src/test/java/com/emipokemon/visual/VisualRefreshRegressionTest.java'
           s = p.read_text()
-          insert = '''\n    @Test\n    void plainHologramTextDoesNotDependOnStreamotesAndLiftedLabelsBypassAnchorCulling() throws Exception {\n        String resolver = source("client/java/com/emipokemon/client/emote/HologramTextResolver.java");\n        assertTrue(resolver.contains("if (!matcher.find()) return Text.literal(resolved);"));\n        assertTrue(resolver.indexOf("if (!matcher.find()) return Text.literal(resolved);")\n                < resolver.indexOf("refreshEmotes();"));\n        String entity = source("main/java/com/emipokemon/hologram/HologramEntity.java");\n        assertTrue(entity.contains("ignoreCameraFrustum = true;"));\n        String renderer = source("client/java/com/emipokemon/client/render/HologramRenderer.java");\n        assertTrue(renderer.contains("matrices.translate(0.0D, 2.35D, 0.0D);"));\n        assertTrue(renderer.contains("TextLayerType.SEE_THROUGH"));\n        assertTrue(renderer.contains("MAX_LIGHT_COORDINATE"));\n    }\n'''
-          assert s.endswith('\n}\n')
-          p.write_text(s[:-3] + insert + '\n}\n')
-
-          (root / 'CHANGELOG-0.4.0-alpha.23.md').write_text('''# Emipokemon 0.4.0-alpha.23\n\nHologram visibility candidate built from the exact alpha.22 source archive.\n\n- Plain hologram text and placeholders bypass Streamotes entirely when no emote token is present.\n- Hologram anchor ignores camera frustum culling because text is rendered 2.35 blocks above a 0.1 x 0.1 anchor.\n- Existing full-bright SEE_THROUGH/NORMAL text passes are preserved.\n- No server-authoritative economy, NPC, rewards, casino, migrations, duplicate protections, EmiProtecciones or Arlight code is changed.\n\nNot considered visually validated until tested in the real Cobbleverse client.\n''')
+          insert = '''\n    @Test\n    void plainHologramTextDoesNotDependOnStreamotesAndLiftedLabelsBypassAnchorCulling() throws Exception {\n        String resolver = source("client/java/com/emipokemon/client/emote/HologramTextResolver.java");\n        assertTrue(resolver.contains("if (!matcher.find()) return Text.literal(resolved);"));\n        assertTrue(resolver.indexOf("if (!matcher.find()) return Text.literal(resolved);") < resolver.indexOf("refreshEmotes();"));\n        String entity = source("main/java/com/emipokemon/hologram/HologramEntity.java");\n        assertTrue(entity.contains("ignoreCameraFrustum = true;"));\n        String renderer = source("client/java/com/emipokemon/client/render/HologramRenderer.java");\n        assertTrue(renderer.contains("matrices.translate(0.0D, 2.35D, 0.0D);"));\n        assertTrue(renderer.contains("TextLayerType.SEE_THROUGH"));\n        assertTrue(renderer.contains("MAX_LIGHT_COORDINATE"));\n    }\n'''
+          assert s.endswith('\n}\n'); p.write_text(s[:-3] + insert + '\n}\n')
           PY
 
       - name: Normalize Gradle wrapper
@@ -82,7 +75,7 @@ jobs:
         working-directory: work
         run: ./gradlew clean test build --no-daemon --stacktrace
 
-      - name: Package alpha.23 source
+      - name: Package outputs and checksums
         shell: bash
         run: |
           set -euxo pipefail
@@ -99,5 +92,6 @@ jobs:
             work/build/libs/*.jar
             Emipokemon-0.4.0-alpha.23-source.zip
             SHA256SUMS-0.4.0-alpha.23.txt
-            work/CHANGELOG-0.4.0-alpha.23.md
           if-no-files-found: error
+
+# CI trigger after installing the base-branch workflow.
