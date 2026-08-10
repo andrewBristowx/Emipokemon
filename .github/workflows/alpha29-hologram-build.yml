@@ -34,12 +34,12 @@ jobs:
           mkdir work
           unzip -q alpha27-source.zip -d work
 
-      - name: Apply alpha.29 patch
+      - name: Apply alpha.29 source transform
         shell: bash
         working-directory: work
         run: |
           set -euxo pipefail
-          git apply "$GITHUB_WORKSPACE/ci/alpha29.patch"
+          python "$GITHUB_WORKSPACE/ci/alpha29_apply.py"
 
       - name: Verify alpha.29 source identity
         shell: bash
