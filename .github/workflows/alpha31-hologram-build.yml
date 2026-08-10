@@ -42,6 +42,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/ci/alpha29_apply.py"
           python3 "$GITHUB_WORKSPACE/ci/alpha30_apply.py"
           python3 "$GITHUB_WORKSPACE/ci/alpha31_apply.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha31_compile_fix.py"
 
       - name: Verify alpha.31 source identity
         shell: bash
@@ -56,6 +57,7 @@ jobs:
           ! grep -q 'TextDisplayHologramMixin' work/src/client/resources/emipokemon.client.mixins.json
           grep -q 'nbt.putByte("see_through", (byte) 0)' work/src/main/java/com/emipokemon/hologram/VanillaTextHologram.java
           grep -q 'public boolean keyPressed(int keyCode, int scanCode, int modifiers)' work/src/client/java/com/emipokemon/client/emote/EmotesButtonWidget.java
+          grep -q 'String fingerprint = entry.text() + "|" + viewerText.getString() + "|" + entry.color();' work/src/main/java/com/emipokemon/hologram/HologramViewerTextService.java
 
       - name: Normalize Gradle wrapper
         shell: bash
