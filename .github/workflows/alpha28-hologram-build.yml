@@ -39,7 +39,7 @@ jobs:
         working-directory: work
         run: |
           set -euxo pipefail
-          git apply "$GITHUB_WORKSPACE/ci/alpha28.patch"
+          patch -p1 < "$GITHUB_WORKSPACE/ci/alpha28.patch"
 
       - name: Verify alpha.28 source identity
         shell: bash
