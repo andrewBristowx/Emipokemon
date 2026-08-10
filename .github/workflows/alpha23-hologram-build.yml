@@ -30,9 +30,9 @@ jobs:
         run: |
           set -euxo pipefail
           curl -fL --retry 3 --retry-delay 2 \
-            'https://drive.usercontent.google.com/download?id=1IBUeCBAVdgyq2LGcMOuTNzKMoWQe-acd&export=download&confirm=t' \
+            'https://drive.usercontent.google.com/download?id=13Uek6OGN9dX0nWOP-ZgbgNPWi8w0agnV&export=download&confirm=t' \
             -o alpha26-source.zip
-          echo 'bf8ab304564bdfb9beef78a5f3ddc76c8a17964d82d64828a185b438dd2ba798  alpha26-source.zip' | sha256sum -c -
+          echo '977f1ff882b55da2da9d41172900524c88a7158652204ac2a2cfb6e6da293bfc  alpha26-source.zip' | sha256sum -c -
           rm -rf work
           mkdir work
           unzip -q alpha26-source.zip -d work
