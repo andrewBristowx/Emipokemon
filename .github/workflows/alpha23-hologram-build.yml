@@ -1,4 +1,4 @@
-name: alpha23-hologram-build
+name: alpha26-build
 
 on:
   pull_request:
@@ -6,11 +6,14 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout CI branch
+      - name: Checkout PR
         uses: actions/checkout@v4
 
       - name: Set up Java 21
@@ -19,46 +22,25 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Download exact alpha.22 source archive
+      - name: Download exact alpha.26 source archive
         shell: bash
         run: |
           set -euxo pipefail
           curl -fL --retry 3 --retry-delay 2 \
-            'https://drive.usercontent.google.com/download?id=1keQPVT9kAnfmyW8HXoBuxPw2nOxV_6RN&export=download&confirm=t' \
-            -o alpha22-source.zip
-          echo 'fbd07096cbdc8bab97862e91016b00faff54efdb50bdd018f4f032d77a8cc830  alpha22-source.zip' | sha256sum -c -
+            'https://drive.usercontent.google.com/download?id=1IBUeCBAVdgyq2LGcMOuTNzKMoWQe-acd&export=download&confirm=t' \
+            -o alpha26-source.zip
+          echo 'bf8ab304564bdfb9beef78a5f3ddc76c8a17964d82d64828a185b438dd2ba798  alpha26-source.zip' | sha256sum -c -
           rm -rf work
           mkdir work
-          unzip -q alpha22-source.zip -d work
+          unzip -q alpha26-source.zip -d work
 
-      - name: Apply alpha.23 hologram-only patch
+      - name: Verify alpha.26 source identity
         shell: bash
         run: |
           set -euxo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-          root = Path('work')
-          p = root / 'gradle.properties'
-          s = p.read_text(); assert 'mod_version=0.4.0-alpha.22' in s
-          p.write_text(s.replace('mod_version=0.4.0-alpha.22', 'mod_version=0.4.0-alpha.23'))
-
-          p = root / 'src/main/java/com/emipokemon/hologram/HologramEntity.java'
-          s = p.read_text()
-          anchor = '        setInvulnerable(true);\n        setNoGravity(true);\n'
-          replacement = anchor + '        // Renderer lifts the text 2.35 blocks above this tiny anchor.\n        // Do not let vanilla frustum culling discard the anchor first.\n        ignoreCameraFrustum = true;\n'
-          assert anchor in s; p.write_text(s.replace(anchor, replacement, 1))
-
-          p = root / 'src/client/java/com/emipokemon/client/emote/HologramTextResolver.java'
-          s = p.read_text()
-          old = '''        String resolved = placeholders(hologram.hologramText().getString(), hologram);\n        refreshEmotes();\n        Matcher matcher = EMOTE.matcher(resolved);\n        MutableText result = Text.empty();\n'''
-          new = '''        String resolved = placeholders(hologram.hologramText().getString(), hologram);\n        Matcher matcher = EMOTE.matcher(resolved);\n        // Plain text/placeholders must work without touching optional Streamotes.\n        if (!matcher.find()) return Text.literal(resolved);\n        matcher.reset();\n        refreshEmotes();\n        MutableText result = Text.empty();\n'''
-          assert old in s; p.write_text(s.replace(old, new, 1))
-
-          p = root / 'src/test/java/com/emipokemon/visual/VisualRefreshRegressionTest.java'
-          s = p.read_text()
-          insert = '''\n    @Test\n    void plainHologramTextDoesNotDependOnStreamotesAndLiftedLabelsBypassAnchorCulling() throws Exception {\n        String resolver = source("client/java/com/emipokemon/client/emote/HologramTextResolver.java");\n        assertTrue(resolver.contains("if (!matcher.find()) return Text.literal(resolved);"));\n        assertTrue(resolver.indexOf("if (!matcher.find()) return Text.literal(resolved);") < resolver.indexOf("refreshEmotes();"));\n        String entity = source("main/java/com/emipokemon/hologram/HologramEntity.java");\n        assertTrue(entity.contains("ignoreCameraFrustum = true;"));\n        String renderer = source("client/java/com/emipokemon/client/render/HologramRenderer.java");\n        assertTrue(renderer.contains("matrices.translate(0.0D, 2.35D, 0.0D);"));\n        assertTrue(renderer.contains("TextLayerType.SEE_THROUGH"));\n        assertTrue(renderer.contains("MAX_LIGHT_COORDINATE"));\n    }\n'''
-          assert s.endswith('\n}\n'); p.write_text(s[:-3] + insert + '\n}\n')
-          PY
+          grep -Fx 'mod_version=0.4.0-alpha.26' work/gradle.properties
+          grep -q 'minecraft:text_display' work/src/main/java/com/emipokemon/hologram/HologramService.java
+          grep -q '0.4.0-alpha.26' work/CHANGELOG-0.4.0-alpha.26.md
 
       - name: Normalize Gradle wrapper
         shell: bash
@@ -72,21 +54,19 @@ jobs:
         working-directory: work
         run: ./gradlew clean test build --no-daemon --stacktrace
 
-      - name: Package outputs and checksums
+      - name: Verify built version and generate checksums
         shell: bash
         run: |
           set -euxo pipefail
-          cd work
-          zip -qr ../Emipokemon-0.4.0-alpha.23-source.zip . -x '.gradle/*' 'build/*'
-          cd ..
-          sha256sum work/build/libs/*.jar Emipokemon-0.4.0-alpha.23-source.zip | tee SHA256SUMS-0.4.0-alpha.23.txt
+          test -f work/build/libs/emipokemon-0.4.0-alpha.26.jar
+          unzip -p work/build/libs/emipokemon-0.4.0-alpha.26.jar fabric.mod.json | grep -q '0.4.0-alpha.26'
+          sha256sum work/build/libs/*.jar | tee SHA256SUMS-0.4.0-alpha.26-github.txt
 
-      - name: Upload build outputs
+      - name: Upload alpha.26 build
         uses: actions/upload-artifact@v4
         with:
-          name: Emipokemon-0.4.0-alpha.23-build
+          name: Emipokemon-0.4.0-alpha.26-github-build
           path: |
             work/build/libs/*.jar
-            Emipokemon-0.4.0-alpha.23-source.zip
-            SHA256SUMS-0.4.0-alpha.23.txt
+            SHA256SUMS-0.4.0-alpha.26-github.txt
           if-no-files-found: error
