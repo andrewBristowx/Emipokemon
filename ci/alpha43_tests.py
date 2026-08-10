@@ -10,6 +10,17 @@ for p in (root/'src/test/java').rglob('*.java'):
     s=s.replace('alpha42VersionIsConsistent','alpha43VersionIsConsistent')
     p.write_text(s)
 
+# Alpha.37's no-blur regression encoded exact old implementation details. Keep the behavior
+# requirement, but allow alpha.43's game-first renderer to satisfy it with a custom backdrop.
+p=root/'src/test/java/com/emipokemon/casino/CasinoVisualRegressionTest.java'
+if p.exists():
+    s=p.read_text()
+    old='''        assertTrue(screen.contains("public void renderBackground(DrawContext context"));\n        assertTrue(screen.contains("context.fill(0, 0, width, height, 0x99000000)"));\n        assertFalse(screen.contains("        renderBackground(context, mouseX, mouseY, delta);"));\n        assertTrue(screen.contains("private static final int PANEL = 0xFF160B1E"));\n        assertTrue(screen.contains("private static final int WHITE = 0xFFFFFFFF"));'''
+    new='''        assertFalse(screen.contains("renderBackground(context"), "casino GUI must never blur its own rendered panel");\n        assertTrue(screen.contains("context.fill(0, 0, width, height, BACKDROP)"));\n        assertTrue(screen.contains("private static final int BACKDROP"));\n        assertTrue(screen.contains("private static final int PANEL"));\n        assertTrue(screen.contains("private static final int WHITE"));'''
+    if old not in s:
+        raise SystemExit('missing alpha43 test anchor: alpha37 no-blur contract')
+    p.write_text(s.replace(old,new,1))
+
 p=root/'src/test/java/com/emipokemon/casino/CasinoRouletteGuiRegressionTest.java'
 p.parent.mkdir(parents=True,exist_ok=True)
 p.write_text(r'''package com.emipokemon.casino;
