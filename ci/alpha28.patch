@@ -1,0 +1,174 @@
+diff --git a/CHANGELOG-0.4.0-alpha.28.md b/CHANGELOG-0.4.0-alpha.28.md
+new file mode 100644
+index 0000000..0f03f96
+--- /dev/null
++++ b/CHANGELOG-0.4.0-alpha.28.md
+@@ -0,0 +1,11 @@
++# Emipokemon 0.4.0-alpha.28
++
++Candidata de corrección de hologramas sobre el motor `minecraft:text_display` validado en alpha.26.
++
++- Corrige la identidad cliente de los hologramas: los command tags no se usan como único marcador; el cliente reconoce el `customName` invisible y sincronizado.
++- Los placeholders por espectador vuelven a pasar por `HologramTextResolver`.
++- Streamotes sigue siendo opcional y un emote desconocido permanece como texto literal.
++- Fuerza profundidad normal en cliente limpiando el bit vanilla `SEE_THROUGH` (0x02) para hologramas Emipokemon.
++- Al arrancar el servidor, los `text_display` persistidos de alpha.26/27 se reconfiguran para aplicar `see_through=false` sin recreación manual.
++- No modifica casino, economía, NPC, recompensas, EmiProtecciones ni Arlight.
++- Requiere validación visual real en Cobbleverse.
+diff --git a/gradle.properties b/gradle.properties
+index b729cc4..450c05d 100644
+--- a/gradle.properties
++++ b/gradle.properties
+@@ -11,6 +11,6 @@ fabric_kotlin_version=1.13.13+kotlin.2.4.10
+ cobblemon_version_id=S1TrAn8c
+ geckolib_version=4.9.2
+ 
+-mod_version=0.4.0-alpha.27
++mod_version=0.4.0-alpha.28
+ maven_group=com.emipokemon
+ archives_base_name=emipokemon
+diff --git a/src/client/java/com/emipokemon/client/emote/HologramTextResolver.java b/src/client/java/com/emipokemon/client/emote/HologramTextResolver.java
+index 41d8f8c..9eb01e4 100644
+--- a/src/client/java/com/emipokemon/client/emote/HologramTextResolver.java
++++ b/src/client/java/com/emipokemon/client/emote/HologramTextResolver.java
+@@ -22,6 +22,7 @@ import java.util.regex.Pattern;
+ 
+ /** Resolves viewer-local placeholders and Streamotes glyphs without trusting client input. */
+ public final class HologramTextResolver {
++    private static final String CUSTOM_NAME_PREFIX = "Emipokemon hologram ";
+     private static final Pattern EMOTE = Pattern.compile(":([A-Za-z0-9_]{1,64}):");
+     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm:ss");
+     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+@@ -74,7 +75,23 @@ public final class HologramTextResolver {
+         return result;
+     }
+ 
++    public static boolean isEmipokemonDisplay(DisplayEntity.TextDisplayEntity display) {
++        return display != null && hologramId(display) != null;
++    }
++
+     private static String hologramId(DisplayEntity.TextDisplayEntity display) {
++        // Command tags are authoritative on the server but are not part of the normal
++        // client entity metadata stream. The invisible custom name is data-tracked, so
++        // it is the reliable client-side identity marker for vanilla text_display entities.
++        Text customName = display.getCustomName();
++        if (customName != null) {
++            String value = customName.getString();
++            if (value.startsWith(CUSTOM_NAME_PREFIX) && value.length() > CUSTOM_NAME_PREFIX.length()) {
++                return value.substring(CUSTOM_NAME_PREFIX.length()).strip().toLowerCase(Locale.ROOT);
++            }
++        }
++
++        // Keep the command-tag path as a fallback for integrated-server/debug environments.
+         final String prefix = "emipokemon:hologram:";
+         for (String tag : display.getCommandTags()) {
+             if (tag.startsWith(prefix) && tag.length() > prefix.length()) return tag.substring(prefix.length());
+diff --git a/src/client/java/com/emipokemon/client/mixin/TextDisplayHologramMixin.java b/src/client/java/com/emipokemon/client/mixin/TextDisplayHologramMixin.java
+index eff9ff2..e00c23a 100644
+--- a/src/client/java/com/emipokemon/client/mixin/TextDisplayHologramMixin.java
++++ b/src/client/java/com/emipokemon/client/mixin/TextDisplayHologramMixin.java
+@@ -25,10 +25,19 @@ public abstract class TextDisplayHologramMixin {
+             CallbackInfoReturnable<DisplayEntity.TextDisplayEntity.Data> cir
+     ) {
+         DisplayEntity.TextDisplayEntity.Data data = cir.getReturnValue();
+-        if (data == null) return;
++        if (data == null || !HologramTextResolver.isEmipokemonDisplay(entity)) return;
++
+         Text resolved = HologramTextResolver.resolve(entity, data.text());
+-        if (resolved == data.text() || resolved.equals(data.text())) return;
++
++        // Vanilla TextDisplayEntity uses bit 0x02 for SEE_THROUGH. Clear it on the
++        // client as a second line of defence so alpha.26/27 entities already loaded
++        // in a world cannot keep rendering through solid blocks.
++        byte depthTestedFlags = (byte) (data.flags() & ~0x02);
++        boolean textChanged = resolved != data.text() && !resolved.equals(data.text());
++        boolean flagsChanged = depthTestedFlags != data.flags();
++        if (!textChanged && !flagsChanged) return;
++
+         cir.setReturnValue(new DisplayEntity.TextDisplayEntity.Data(
+-                resolved, data.lineWidth(), data.textOpacity(), data.backgroundColor(), data.flags()));
++                resolved, data.lineWidth(), data.textOpacity(), data.backgroundColor(), depthTestedFlags));
+     }
+ }
+diff --git a/src/main/java/com/emipokemon/Emipokemon.java b/src/main/java/com/emipokemon/Emipokemon.java
+index f8b9c66..7bf7893 100644
+--- a/src/main/java/com/emipokemon/Emipokemon.java
++++ b/src/main/java/com/emipokemon/Emipokemon.java
+@@ -36,7 +36,7 @@ import org.slf4j.LoggerFactory;
+ 
+ public final class Emipokemon implements ModInitializer {
+     public static final String MOD_ID = "emipokemon";
+-    public static final String VERSION = "0.4.0-alpha.27";
++    public static final String VERSION = "0.4.0-alpha.28";
+     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
+ 
+     private static final ConfigManager CONFIG_MANAGER = new ConfigManager();
+diff --git a/src/main/java/com/emipokemon/hologram/HologramService.java b/src/main/java/com/emipokemon/hologram/HologramService.java
+index edcea78..a132dfc 100644
+--- a/src/main/java/com/emipokemon/hologram/HologramService.java
++++ b/src/main/java/com/emipokemon/hologram/HologramService.java
+@@ -13,7 +13,7 @@ import java.util.List;
+ /**
+  * Server-authoritative hologram service.
+  *
+- * alpha.26 deliberately separates persistence from rendering: HologramRegistryStore owns the data,
++ * alpha.28 keeps persistence separate from rendering: HologramRegistryStore owns the data,
+  * while the runtime visual is Minecraft's vanilla text_display entity. HologramEntity is retained
+  * only to migrate alpha.20-alpha.25 worlds and is never spawned for new holograms.
+  */
+@@ -50,9 +50,18 @@ public final class HologramService {
+         if (server == null) return;
+         migrateLegacyLoaded(server);
+         for (HologramRegistryStore.Entry entry : HologramRegistryStore.all()) {
+-            if (findLoaded(server, entry.id()) != null) continue;
+             ServerWorld world = worldFor(server, entry.world());
+-            if (world != null) VanillaTextHologram.spawn(world, entry);
++            if (world == null) continue;
++
++            DisplayEntity.TextDisplayEntity loaded = findLoaded(server, entry.id());
++            if (loaded != null) {
++                // Re-apply alpha.28 visual metadata to displays persisted by alpha.26/27.
++                // In particular this clears see_through without requiring the admin to
++                // delete and recreate every hologram after upgrading.
++                VanillaTextHologram.configure(loaded, world, entry);
++                continue;
++            }
++            VanillaTextHologram.spawn(world, entry);
+         }
+     }
+ 
+diff --git a/src/test/java/com/emipokemon/visual/VisualRefreshRegressionTest.java b/src/test/java/com/emipokemon/visual/VisualRefreshRegressionTest.java
+index efa2aa9..4e9e02f 100644
+--- a/src/test/java/com/emipokemon/visual/VisualRefreshRegressionTest.java
++++ b/src/test/java/com/emipokemon/visual/VisualRefreshRegressionTest.java
+@@ -63,23 +63,27 @@ class VisualRefreshRegressionTest {
+ 
+ 
+     @Test
+-    void alpha27VersionIsConsistentInSource() throws Exception {
++    void alpha28VersionIsConsistentInSource() throws Exception {
+         String core = source("main/java/com/emipokemon/Emipokemon.java");
+-        assertTrue(core.contains("0.4.0-alpha.27"));
++        assertTrue(core.contains("0.4.0-alpha.28"));
+         assertFalse(core.contains("0.4.0-alpha.22"));
+     }
+ 
+     @Test
+-    void vanillaTextDisplayKeepsRendererWhileClientMixinAddsPlaceholdersAndOptionalEmotes() throws Exception {
++    void vanillaTextDisplayKeepsRendererWhileClientMixinAddsPlaceholdersOptionalEmotesAndDepthTesting() throws Exception {
+         String mixin = source("client/java/com/emipokemon/client/mixin/TextDisplayHologramMixin.java");
+         assertTrue(mixin.contains("TextDisplayEntityRenderer.class"));
+         assertTrue(mixin.contains("HologramTextResolver.resolve(entity, data.text())"));
+         assertTrue(mixin.contains("new DisplayEntity.TextDisplayEntity.Data"));
++        assertTrue(mixin.contains("data.flags() & ~0x02"));
++        assertTrue(mixin.contains("HologramTextResolver.isEmipokemonDisplay(entity)"));
+         String resolver = source("client/java/com/emipokemon/client/emote/HologramTextResolver.java");
+         assertTrue(resolver.contains("resolve(DisplayEntity.TextDisplayEntity display, Text serverText)"));
+         assertTrue(resolver.contains("if (!matcher.find()) return Text.literal(resolved).setStyle(serverText.getStyle());"));
+         assertTrue(resolver.contains("StreamotesCatalog.revision()"));
+         assertTrue(resolver.contains("{hologram_id}"));
++        assertTrue(resolver.contains("CUSTOM_NAME_PREFIX"));
++        assertTrue(resolver.contains("display.getCustomName()"));
+     }
+ 
+ }
