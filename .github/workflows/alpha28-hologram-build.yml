@@ -45,7 +45,7 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          grep -Fx 'mod_version=0.4.0-alpha.28' work/gradle.properties
+          grep -q '^mod_version=0.4.0-alpha.28' work/gradle.properties
           grep -q 'CUSTOM_NAME_PREFIX = "Emipokemon hologram "' work/src/client/java/com/emipokemon/client/emote/HologramTextResolver.java
           grep -q 'display.getCustomName()' work/src/client/java/com/emipokemon/client/emote/HologramTextResolver.java
           grep -q 'data.flags() & ~0x02' work/src/client/java/com/emipokemon/client/mixin/TextDisplayHologramMixin.java
