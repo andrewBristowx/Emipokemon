@@ -48,6 +48,7 @@ jobs:
           rm -f src/client/java/com/emipokemon/EmipokemonClient.java
           python3 "$GITHUB_WORKSPACE/ci/alpha33_apply.py"
           python3 "$GITHUB_WORKSPACE/ci/alpha34_apply.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha34_test_fix.py"
 
       - name: Verify alpha.34 source identity
         shell: bash
