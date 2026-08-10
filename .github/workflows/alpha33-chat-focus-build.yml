@@ -1,0 +1,95 @@
+name: alpha33-build
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Download exact alpha.27 source archive
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 3 --retry-delay 2 \
+            'https://drive.usercontent.google.com/download?id=1hW1-TH2UK6c2BIwZae7ux6zSM3opL10N&export=download&confirm=t' \
+            -o alpha27-source.zip
+          echo 'a7e5545668760f84d036ee017622d32d9b8fa0ffe4b77cfdae10d40c820abf4b  alpha27-source.zip' | sha256sum -c -
+          rm -rf work
+          mkdir work
+          unzip -q alpha27-source.zip -d work
+
+      - name: Apply alpha.29 through alpha.33 source transforms
+        shell: bash
+        working-directory: work
+        run: |
+          set -euxo pipefail
+          python3 "$GITHUB_WORKSPACE/ci/alpha29_apply.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha30_apply.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha31_apply.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha31_compile_fix.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha32_client_path.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha32_apply.py"
+          rm -f src/client/java/com/emipokemon/EmipokemonClient.java
+          python3 "$GITHUB_WORKSPACE/ci/alpha33_apply.py"
+
+      - name: Verify alpha.33 source identity
+        shell: bash
+        run: |
+          set -euxo pipefail
+          grep -q '^mod_version=0.4.0-alpha.33' work/gradle.properties
+          grep -q 'HologramViewerTextService.initialize()' work/src/main/java/com/emipokemon/Emipokemon.java
+          grep -R -q 'HologramStreamotesClientService.initialize()' work/src/client/java
+          grep -q 'EmoticonRegistry' work/src/client/java/com/emipokemon/client/emote/HologramStreamotesClientService.java
+          grep -q 'makeEmoteStyle' work/src/client/java/com/emipokemon/client/emote/HologramStreamotesClientService.java
+          grep -q 'nbt.putByte("see_through", (byte) 0)' work/src/main/java/com/emipokemon/hologram/VanillaTextHologram.java
+          grep -q 'public boolean keyPressed(int keyCode, int scanCode, int modifiers)' work/src/client/java/com/emipokemon/client/emote/EmotesButtonWidget.java
+          ! grep -q 'public void setFocused(boolean focused)' work/src/client/java/com/emipokemon/client/emote/EmotesButtonWidget.java
+          ! grep -q 'super.setFocused(false)' work/src/client/java/com/emipokemon/client/emote/EmotesButtonWidget.java
+          grep -q 'chatScreen.setFocused(field);' work/src/client/java/com/emipokemon/client/emote/ChatEmoteController.java
+          grep -q 'field.setFocused(true);' work/src/client/java/com/emipokemon/client/emote/ChatEmoteController.java
+          grep -q 'activeOverlay.focusChatOnNextTick();' work/src/client/java/com/emipokemon/client/emote/ChatEmoteController.java
+
+      - name: Normalize Gradle wrapper
+        shell: bash
+        working-directory: work
+        run: |
+          sed -i 's/\r$//' gradlew
+          chmod +x gradlew
+
+      - name: Test and build with Java 21
+        shell: bash
+        working-directory: work
+        run: ./gradlew clean test build --no-daemon --stacktrace
+
+      - name: Verify built version and generate checksums
+        shell: bash
+        run: |
+          set -euxo pipefail
+          test -f work/build/libs/emipokemon-0.4.0-alpha.33.jar
+          unzip -p work/build/libs/emipokemon-0.4.0-alpha.33.jar fabric.mod.json | grep -q '0.4.0-alpha.33'
+          sha256sum work/build/libs/*.jar | tee SHA256SUMS-0.4.0-alpha.33-github.txt
+
+      - name: Upload alpha.33 build
+        uses: actions/upload-artifact@v4
+        with:
+          name: Emipokemon-0.4.0-alpha.33-github-build
+          path: |
+            work/build/libs/*.jar
+            SHA256SUMS-0.4.0-alpha.33-github.txt
+          if-no-files-found: error
