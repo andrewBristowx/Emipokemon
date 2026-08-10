@@ -43,7 +43,9 @@ jobs:
           python3 "$GITHUB_WORKSPACE/ci/alpha30_apply.py"
           python3 "$GITHUB_WORKSPACE/ci/alpha31_apply.py"
           python3 "$GITHUB_WORKSPACE/ci/alpha31_compile_fix.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha32_client_path.py"
           python3 "$GITHUB_WORKSPACE/ci/alpha32_apply.py"
+          rm -f src/client/java/com/emipokemon/EmipokemonClient.java
 
       - name: Verify alpha.32 source identity
         shell: bash
@@ -52,7 +54,7 @@ jobs:
           grep -q '^mod_version=0.4.0-alpha.32' work/gradle.properties
           grep -q 'HologramViewerTextService.initialize()' work/src/main/java/com/emipokemon/Emipokemon.java
           grep -q 'return Text.literal(resolved).setStyle(base);' work/src/main/java/com/emipokemon/hologram/HologramViewerTextService.java
-          grep -q 'HologramStreamotesClientService.initialize()' work/src/client/java/com/emipokemon/EmipokemonClient.java
+          grep -R -q 'HologramStreamotesClientService.initialize()' work/src/client/java
           grep -q 'EmoticonRegistry' work/src/client/java/com/emipokemon/client/emote/HologramStreamotesClientService.java
           grep -q 'makeEmoteStyle' work/src/client/java/com/emipokemon/client/emote/HologramStreamotesClientService.java
           grep -q 'display.getDataTracker().set(trackedText, resolved, true)' work/src/client/java/com/emipokemon/client/emote/HologramStreamotesClientService.java
