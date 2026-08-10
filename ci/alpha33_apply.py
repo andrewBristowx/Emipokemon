@@ -45,11 +45,18 @@ replacement = '''            // Adding controls can change the selected element 
 s = replace_once(s, anchor, replacement, 'restore chat focus immediately and next tick')
 write(p, s)
 
-# Regression coverage.
+# Regression coverage. Alpha.30 had an old expectation that the button must forcibly clear focus;
+# alpha.33 intentionally reverses that expectation while keeping keyPressed() keyboard-inert.
 p = 'src/test/java/com/emipokemon/visual/VisualRefreshRegressionTest.java'
 s = read(p)
 s = s.replace('alpha32VersionIsConsistentInSource', 'alpha33VersionIsConsistentInSource')
 s = s.replace('0.4.0-alpha.32', '0.4.0-alpha.33')
+s = replace_once(
+    s,
+    '        assertTrue(emotesButton.contains("super.setFocused(false);"));',
+    '        assertFalse(emotesButton.contains("super.setFocused(false);"));',
+    'update alpha30 focus regression expectation'
+)
 insert = '''\n    @Test\n    void alpha33EmotesButtonDoesNotStealChatFocus() throws Exception {\n        String button = source("client/java/com/emipokemon/client/emote/EmotesButtonWidget.java");\n        String controller = source("client/java/com/emipokemon/client/emote/ChatEmoteController.java");\n        assertTrue(button.contains("public boolean keyPressed(int keyCode, int scanCode, int modifiers)"));\n        assertTrue(button.contains("return false;"));\n        assertFalse(button.contains("public void setFocused(boolean focused)"));\n        assertFalse(button.contains("super.setFocused(false)"));\n        assertTrue(controller.contains("chatScreen.setFocused(field);"));\n        assertTrue(controller.contains("field.setFocused(true);"));\n        assertTrue(controller.contains("activeOverlay.focusChatOnNextTick();"));\n    }\n'''
 pos = s.rfind('\n}')
 if pos < 0:
