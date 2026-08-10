@@ -74,6 +74,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/ci/alpha38_tests.py"
           python3 "$GITHUB_WORKSPACE/ci/alpha39_core.py"
           python3 "$GITHUB_WORKSPACE/ci/alpha39_models.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha39_compile_fix.py"
           python3 "$GITHUB_WORKSPACE/ci/alpha39_textures.py"
           python3 "$GITHUB_WORKSPACE/ci/alpha39_tests.py"
 
