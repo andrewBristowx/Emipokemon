@@ -1,0 +1,100 @@
+name: alpha37-casino-build
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Download exact alpha.27 source baseline
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 3 --retry-delay 2 'https://drive.usercontent.google.com/download?id=1hW1-TH2UK6c2BIwZae7ux6zSM3opL10N&export=download&confirm=t' -o alpha27-source.zip
+          echo 'a7e5545668760f84d036ee017622d32d9b8fa0ffe4b77cfdae10d40c820abf4b  alpha27-source.zip' | sha256sum -c -
+          rm -rf work ci-history && mkdir work ci-history
+          unzip -q alpha27-source.zip -d work
+
+      - name: Fetch exact alpha.29-alpha.35 transform history
+        shell: bash
+        run: |
+          set -euxo pipefail
+          base34='https://raw.githubusercontent.com/andrewBristowx/Emipokemon/2494bdfcbaa1b282962178d67d82ad136b404811/ci'
+          for f in alpha29_apply.py alpha30_apply.py alpha31_apply.py alpha31_compile_fix.py alpha32_client_path.py alpha32_apply.py alpha33_apply.py alpha34_apply.py alpha34_test_fix.py; do curl -fL --retry 3 "$base34/$f" -o "ci-history/$f"; done
+          curl -fL --retry 3 'https://raw.githubusercontent.com/andrewBristowx/Emipokemon/56eca300953a194b13596c17f064430c7f383ded/ci/alpha35_apply.py' -o ci-history/alpha35_apply.py
+
+      - name: Reconstruct alpha.36 and apply alpha.37
+        shell: bash
+        working-directory: work
+        run: |
+          set -euxo pipefail
+          for f in alpha29_apply.py alpha30_apply.py alpha31_apply.py alpha31_compile_fix.py alpha32_client_path.py alpha32_apply.py; do python3 "$GITHUB_WORKSPACE/ci-history/$f"; done
+          rm -f src/client/java/com/emipokemon/EmipokemonClient.java
+          for f in alpha33_apply.py alpha34_apply.py alpha34_test_fix.py alpha35_apply.py; do python3 "$GITHUB_WORKSPACE/ci-history/$f"; done
+          python3 "$GITHUB_WORKSPACE/ci/alpha36_server.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha36_client.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha36_visual.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha36_tests.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha37_core.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha37_visual.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha37_tests.py"
+
+      - name: Verify alpha.37 identity and visual invariants
+        shell: bash
+        run: |
+          set -euxo pipefail
+          grep -q '^mod_version=0.4.0-alpha.37' work/gradle.properties
+          grep -q 'context.fill(0, 0, width, height, 0x99000000)' work/src/client/java/com/emipokemon/client/casino/CasinoScreen.java
+          ! grep -q '        renderBackground(context, mouseX, mouseY, delta);' work/src/client/java/com/emipokemon/client/casino/CasinoScreen.java
+          grep -q 'class CasinoTableService' work/src/main/java/com/emipokemon/casino/CasinoTableService.java
+          grep -q 'RANDOM.nextInt(37)' work/src/main/java/com/emipokemon/casino/CasinoTableService.java
+          test -f work/src/main/resources/assets/emipokemon/textures/block/casino_slot.png
+          test -f work/src/main/resources/assets/emipokemon/textures/block/casino_roulette.png
+
+      - name: Normalize Gradle wrapper
+        shell: bash
+        working-directory: work
+        run: |
+          sed -i 's/\r$//' gradlew
+          chmod +x gradlew
+
+      - name: Test and build with Java 21
+        shell: bash
+        working-directory: work
+        run: ./gradlew clean test build --no-daemon --stacktrace
+
+      - name: Verify built version and generate checksums
+        shell: bash
+        working-directory: work
+        run: |
+          set -euxo pipefail
+          jar=$(find build/libs -maxdepth 1 -type f -name 'emipokemon-0.4.0-alpha.37.jar' | head -n 1)
+          test -n "$jar"
+          sha256sum "$jar" | tee SHA256SUMS-0.4.0-alpha.37.txt
+          zip -qr Emipokemon-0.4.0-alpha.37-source.zip src gradle gradlew gradlew.bat build.gradle gradle.properties settings.gradle CHANGELOG-0.4.0-alpha.37.md -x '*/build/*'
+
+      - name: Upload alpha.37 build
+        uses: actions/upload-artifact@v4
+        with:
+          name: Emipokemon-0.4.0-alpha.37-github-build
+          path: |
+            work/build/libs/emipokemon-0.4.0-alpha.37.jar
+            work/build/libs/emipokemon-0.4.0-alpha.37-sources.jar
+            work/SHA256SUMS-0.4.0-alpha.37.txt
+            work/Emipokemon-0.4.0-alpha.37-source.zip
+          if-no-files-found: error
