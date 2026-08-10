@@ -11,3 +11,5 @@ Objetivo de esta candidata:
 - desactivar `see_through` para respetar la profundidad de bloques.
 
 El workflow debe compilar con Temurin Java 21 mediante `./gradlew clean test build --no-daemon --stacktrace`. La compilación no equivale a validación visual en Cobbleverse.
+
+Sincronización CI: fuente compartida de Drive verificada por hash y lista para GitHub Actions.
