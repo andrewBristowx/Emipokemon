@@ -30,25 +30,34 @@ jobs:
             'https://drive.usercontent.google.com/download?id=1hW1-TH2UK6c2BIwZae7ux6zSM3opL10N&export=download&confirm=t' \
             -o alpha27-source.zip
           echo 'a7e5545668760f84d036ee017622d32d9b8fa0ffe4b77cfdae10d40c820abf4b  alpha27-source.zip' | sha256sum -c -
-          rm -rf work
-          mkdir work
+          rm -rf work ci-history
+          mkdir work ci-history
           unzip -q alpha27-source.zip -d work
+
+      - name: Fetch exact alpha.29-alpha.34 transform history
+        shell: bash
+        run: |
+          set -euxo pipefail
+          base='https://raw.githubusercontent.com/andrewBristowx/Emipokemon/2494bdfcbaa1b282962178d67d82ad136b404811/ci'
+          for f in alpha29_apply.py alpha30_apply.py alpha31_apply.py alpha31_compile_fix.py alpha32_client_path.py alpha32_apply.py alpha33_apply.py alpha34_apply.py alpha34_test_fix.py; do
+            curl -fL --retry 3 "$base/$f" -o "ci-history/$f"
+          done
 
       - name: Apply alpha.29 through alpha.35 source transforms
         shell: bash
         working-directory: work
         run: |
           set -euxo pipefail
-          python3 "$GITHUB_WORKSPACE/ci/alpha29_apply.py"
-          python3 "$GITHUB_WORKSPACE/ci/alpha30_apply.py"
-          python3 "$GITHUB_WORKSPACE/ci/alpha31_apply.py"
-          python3 "$GITHUB_WORKSPACE/ci/alpha31_compile_fix.py"
-          python3 "$GITHUB_WORKSPACE/ci/alpha32_client_path.py"
-          python3 "$GITHUB_WORKSPACE/ci/alpha32_apply.py"
+          python3 "$GITHUB_WORKSPACE/ci-history/alpha29_apply.py"
+          python3 "$GITHUB_WORKSPACE/ci-history/alpha30_apply.py"
+          python3 "$GITHUB_WORKSPACE/ci-history/alpha31_apply.py"
+          python3 "$GITHUB_WORKSPACE/ci-history/alpha31_compile_fix.py"
+          python3 "$GITHUB_WORKSPACE/ci-history/alpha32_client_path.py"
+          python3 "$GITHUB_WORKSPACE/ci-history/alpha32_apply.py"
           rm -f src/client/java/com/emipokemon/EmipokemonClient.java
-          python3 "$GITHUB_WORKSPACE/ci/alpha33_apply.py"
-          python3 "$GITHUB_WORKSPACE/ci/alpha34_apply.py"
-          python3 "$GITHUB_WORKSPACE/ci/alpha34_test_fix.py"
+          python3 "$GITHUB_WORKSPACE/ci-history/alpha33_apply.py"
+          python3 "$GITHUB_WORKSPACE/ci-history/alpha34_apply.py"
+          python3 "$GITHUB_WORKSPACE/ci-history/alpha34_test_fix.py"
           python3 "$GITHUB_WORKSPACE/ci/alpha35_apply.py"
 
       - name: Verify alpha.35 source identity
