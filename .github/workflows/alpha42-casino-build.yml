@@ -44,8 +44,6 @@ jobs:
             curl -fL --retry 3 "$base34/$f" -o "ci-history/$f"
           done
           curl -fL --retry 3 'https://raw.githubusercontent.com/andrewBristowx/Emipokemon/56eca300953a194b13596c17f064430c7f383ded/ci/alpha35_apply.py' -o ci-history/alpha35_apply.py
-          # This commit contains only the model-detail script we authored for the current visual fix.
-          # We fetch that exact file to avoid pulling the unrelated alpha.41 GUI experiment.
           curl -fL --retry 3 'https://raw.githubusercontent.com/andrewBristowx/Emipokemon/0691f7206a9bf6674c9843fc339d43de2e96aca9/ci/alpha41_models.py' -o ci-history/alpha42_models_fix.py
 
       - name: Reconstruct alpha.40 and apply isolated alpha.42 visual fix
@@ -85,6 +83,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/ci/alpha40_tests.py"
           python3 "$GITHUB_WORKSPACE/ci/alpha42_core.py"
           python3 "$GITHUB_WORKSPACE/ci-history/alpha42_models_fix.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha42_model_followup.py"
           python3 "$GITHUB_WORKSPACE/ci/alpha42_tests.py"
 
       - name: Verify alpha.42 identity and gameplay invariants
