@@ -1,0 +1,84 @@
+name: alpha30-build
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Download exact alpha.27 source archive
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 3 --retry-delay 2 \
+            'https://drive.usercontent.google.com/download?id=1hW1-TH2UK6c2BIwZae7ux6zSM3opL10N&export=download&confirm=t' \
+            -o alpha27-source.zip
+          echo 'a7e5545668760f84d036ee017622d32d9b8fa0ffe4b77cfdae10d40c820abf4b  alpha27-source.zip' | sha256sum -c -
+          rm -rf work
+          mkdir work
+          unzip -q alpha27-source.zip -d work
+
+      - name: Apply alpha.29 and alpha.30 source transforms
+        shell: bash
+        working-directory: work
+        run: |
+          set -euxo pipefail
+          python3 "$GITHUB_WORKSPACE/ci/alpha29_apply.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha30_apply.py"
+
+      - name: Verify alpha.30 source identity
+        shell: bash
+        run: |
+          set -euxo pipefail
+          grep -q '^mod_version=0.4.0-alpha.30' work/gradle.properties
+          grep -q 'PLACEHOLDER.matcher(raw).find() || EMOTE.matcher(raw).find()' work/src/client/java/com/emipokemon/client/emote/HologramTextResolver.java
+          grep -q 'id == null && !shouldResolve(serverText)' work/src/client/java/com/emipokemon/client/emote/HologramTextResolver.java
+          grep -q 'public boolean keyPressed(int keyCode, int scanCode, int modifiers)' work/src/client/java/com/emipokemon/client/emote/EmotesButtonWidget.java
+          grep -q 'super.setFocused(false)' work/src/client/java/com/emipokemon/client/emote/EmotesButtonWidget.java
+          grep -q 'data.flags() & ~0x02' work/src/client/java/com/emipokemon/client/mixin/TextDisplayHologramMixin.java
+          grep -q '0.4.0-alpha.30' work/CHANGELOG-0.4.0-alpha.30.md
+
+      - name: Normalize Gradle wrapper
+        shell: bash
+        working-directory: work
+        run: |
+          sed -i 's/\r$//' gradlew
+          chmod +x gradlew
+
+      - name: Test and build with Java 21
+        shell: bash
+        working-directory: work
+        run: ./gradlew clean test build --no-daemon --stacktrace
+
+      - name: Verify built version and generate checksums
+        shell: bash
+        run: |
+          set -euxo pipefail
+          test -f work/build/libs/emipokemon-0.4.0-alpha.30.jar
+          unzip -p work/build/libs/emipokemon-0.4.0-alpha.30.jar fabric.mod.json | grep -q '0.4.0-alpha.30'
+          sha256sum work/build/libs/*.jar | tee SHA256SUMS-0.4.0-alpha.30-github.txt
+
+      - name: Upload alpha.30 build
+        uses: actions/upload-artifact@v4
+        with:
+          name: Emipokemon-0.4.0-alpha.30-github-build
+          path: |
+            work/build/libs/*.jar
+            SHA256SUMS-0.4.0-alpha.30-github.txt
+          if-no-files-found: error
