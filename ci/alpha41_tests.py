@@ -20,6 +20,16 @@ for rel in [
         s=s.replace('alpha40TablesStayAtFurnitureHeight','alpha41TablesStayAtFurnitureHeight')
         s=s.replace('alpha40RendererSupportsTallGeometry','alpha41RendererSupportsTallGeometry')
         s=s.replace('alpha40TexturesContainMaterialVariation','alpha41TexturesContainMaterialVariation')
+        # alpha.41 keeps the no-blur invariant but moved the dim color and panel values
+        # behind named constants as part of the GUI refactor. Update the inherited alpha.37
+        # source-level regression so it validates the behavior rather than obsolete literals.
+        if rel.endswith('CasinoVisualRegressionTest.java'):
+            s=s.replace('assertTrue(screen.contains("context.fill(0, 0, width, height, 0x99000000)"));',
+                        'assertTrue(screen.contains("context.fill(0, 0, width, height, BACKDROP)"));')
+            s=s.replace('assertTrue(screen.contains("private static final int PANEL = 0xFF160B1E"));',
+                        'assertTrue(screen.contains("private static final int PANEL = 0xFF100B16"));')
+            s=s.replace('void alpha37CasinoScreenDoesNotBlurItsOwnUi()',
+                        'void alpha41CasinoScreenDoesNotBlurItsOwnUi()')
         p.write_text(s)
 
 p=root/'src/test/java/com/emipokemon/casino/CasinoGuiRegressionTest.java'
