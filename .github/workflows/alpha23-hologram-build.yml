@@ -42,7 +42,8 @@ jobs:
         run: |
           set -euxo pipefail
           grep -Fx 'mod_version=0.4.0-alpha.26' work/gradle.properties
-          grep -q 'minecraft:text_display' work/src/main/java/com/emipokemon/hologram/HologramService.java
+          grep -q 'EntityType.TEXT_DISPLAY' work/src/main/java/com/emipokemon/hologram/HologramService.java
+          grep -q 'DisplayEntity.TextDisplayEntity' work/src/main/java/com/emipokemon/hologram/VanillaTextHologram.java
           grep -q '0.4.0-alpha.26' work/CHANGELOG-0.4.0-alpha.26.md
 
       - name: Normalize Gradle wrapper
