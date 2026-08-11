@@ -1,0 +1,262 @@
+--- src/client/java/com/emipokemon/client/casino/CasinoScreen.java
++++ src/client/java/com/emipokemon/client/casino/CasinoScreen.java
+@@ -9,6 +9,7 @@
+ import net.minecraft.client.gui.widget.TextFieldWidget;
+ import net.minecraft.text.Text;
+ import net.minecraft.util.Identifier;
++import net.minecraft.util.Formatting;
+ 
+ import java.util.ArrayList;
+ import java.util.List;
+@@ -40,6 +41,7 @@
+     private static final int ROULETTE_LEFT_TEX_H = 828;
+     private static final int ROULETTE_SIDE_TEX_W = 440;
+     private static final int ROULETTE_SIDE_TEX_H = 828;
++    private static final int ROULETTE_DISPLAY_CAPACITY = 8;
+ 
+     private static final int BACKDROP = 0xD20A070B;
+     private static final int PANEL = 0xFF17100F;
+@@ -116,7 +118,7 @@
+ 
+     private void initRoulette() {
+         int gap = 8;
+-        rouletteContentH = Math.max(340, panelH - rouletteHeaderH);
++        rouletteContentH = Math.max(334, panelH - rouletteHeaderH - 6);
+         int idealGameW = Math.round(rouletteContentH * (ROULETTE_LEFT_W / (float)ROULETTE_LEFT_H));
+         int idealSideW = Math.round(rouletteContentH * (ROULETTE_SIDE_W / (float)ROULETTE_SIDE_H));
+         int availableW = panelW - 24;
+@@ -252,27 +254,48 @@
+             drawAsset(context, ROULETTE_HEADER, panelX, panelY, panelW, rouletteHeaderH, ROULETTE_HEADER_TEX_W, ROULETTE_HEADER_TEX_H);
+             drawAsset(context, ROULETTE_LEFT_PANEL, gameX, contentTop, gameW, rouletteContentH, ROULETTE_LEFT_TEX_W, ROULETTE_LEFT_TEX_H);
+             drawAsset(context, ROULETTE_SIDE_PANEL, sideX, contentTop, sideW, rouletteContentH, ROULETTE_SIDE_TEX_W, ROULETTE_SIDE_TEX_H);
+-            String balance = state.balance() + " Michicoins";
+-            int balanceX = panelX + Math.round(panelW * 0.790F);
+-            context.drawTextWithShadow(textRenderer, Text.literal(balance), balanceX, panelY + 34, 0xFFFFD75A);
++            renderRouletteEdgeCleanup(context);
++
++            // Let the real TextFieldWidget receive focus/keyboard input first. Roulette chrome and
++            // dynamic values are then painted over it so values look like part of the casino art.
++            super.render(context, mouseX, mouseY, delta);
+             renderRoulette(context, mouseX, mouseY);
+-        } else {
+-            context.fill(panelX, panelY, panelX + panelW, panelY + panelH, PANEL);
+-            outline(context, panelX, panelY, panelW, panelH, GOLD_DARK);
+-            outline(context, panelX + 2, panelY + 2, panelW - 4, panelH - 4, LINE);
+-            context.fill(panelX, panelY, panelX + panelW, panelY + 5, GOLD_DARK);
+-            context.fill(panelX, panelY + 5, panelX + panelW, panelY + 8, GOLD);
+-            String title = safe(state.title(), "Casino Emipokemon");
+-            context.drawTextWithShadow(textRenderer, Text.literal(title), panelX + 24, panelY + 20, WHITE);
+-            context.drawTextWithShadow(textRenderer, Text.literal("MESA MULTIJUGADOR · SERVIDOR AUTORITATIVO"), panelX + 24, panelY + 40, 0xFF9FD8AF);
+-            String balance = state.balance() + " Michicoins";
+-            context.drawTextWithShadow(textRenderer, Text.literal(balance), panelX + panelW - 122 - textRenderer.getWidth(balance), panelY + 34, GOLD);
+-            renderGeneric(context);
++            return;
+         }
++
++        context.fill(panelX, panelY, panelX + panelW, panelY + panelH, PANEL);
++        outline(context, panelX, panelY, panelW, panelH, GOLD_DARK);
++        outline(context, panelX + 2, panelY + 2, panelW - 4, panelH - 4, LINE);
++        context.fill(panelX, panelY, panelX + panelW, panelY + 5, GOLD_DARK);
++        context.fill(panelX, panelY + 5, panelX + panelW, panelY + 8, GOLD);
++        String title = safe(state.title(), "Casino Emipokemon");
++        context.drawTextWithShadow(textRenderer, Text.literal(title), panelX + 24, panelY + 20, WHITE);
++        context.drawTextWithShadow(textRenderer, Text.literal("MESA MULTIJUGADOR · SERVIDOR AUTORITATIVO"), panelX + 24, panelY + 40, 0xFF9FD8AF);
++        String balance = state.balance() + " Michicoins";
++        context.drawTextWithShadow(textRenderer, Text.literal(balance), panelX + panelW - 122 - textRenderer.getWidth(balance), panelY + 34, GOLD);
++        renderGeneric(context);
+         super.render(context, mouseX, mouseY, delta);
+     }
+ 
++    private void renderRouletteEdgeCleanup(DrawContext context) {
++        // The approved source art contains a few decorative chips/coins that were already cut
++        // by the original image boundary. Replace only those terminal pixels with a complete
++        // in-game frame so no partial ornament appears clipped at the bottom of the GUI.
++        int leftTrim = Math.max(5, leftPy(14));
++        int leftBottom = contentTop + rouletteContentH;
++        context.fill(gameX + 2, leftBottom - leftTrim, gameX + gameW - 2, leftBottom - 2, 0xFF07503A);
++        context.fill(gameX + 2, leftBottom - 3, gameX + gameW - 2, leftBottom - 1, 0xFFD69A30);
++        outline(context, gameX, contentTop, gameW, rouletteContentH, 0xFFB87825);
++
++        int sideTrim = Math.max(7, sidePy(21));
++        int sideBottom = contentTop + rouletteContentH;
++        context.fill(sideX + 2, sideBottom - sideTrim, sideX + sideW - 2, sideBottom - 2, 0xFF130A18);
++        context.fill(sideX + 2, sideBottom - 3, sideX + sideW - 2, sideBottom - 1, 0xFFD69A30);
++        outline(context, sideX, contentTop, sideW, rouletteContentH, 0xFFB87825);
++    }
++
+     private void renderRoulette(DrawContext context, int mouseX, int mouseY) {
++        renderHeaderBalance(context);
+         drawRouletteWheel(context);
+         drawRecentResults(context);
+ 
+@@ -280,27 +303,98 @@
+         for (RouletteCell cell : rouletteCells) drawRouletteCell(context, cell, mouseX, mouseY, selected);
+         drawQuickChipControls(context, mouseX, mouseY);
+ 
+-        // Dynamic right-panel data placed over the static casino chrome asset.
+-        int roundY = contentTop + sidePy(47);
+-        drawBadge(context, sideX + sidePx(27), roundY, phaseLabel(), isBettingPhase() ? 0xFF83F0A8 : GOLD);
+-        String timer = timerOnly();
+-        if (!timer.isBlank()) {
+-            context.drawTextWithShadow(textRenderer, Text.literal(timer), sideX + sidePx(188), roundY + 5, 0xFFFFE59A);
+-        }
++        renderRoundState(context);
++        renderWagerAmount(context);
+ 
+         String selectedAmount = selectedBetAmount();
+-        String own = selected.isBlank() ? "Aún no has apostado" : betLabel(selected) + (selectedAmount.isBlank() ? "" : " · " + selectedAmount);
+-        drawWrapped(context, own, sideX + sidePx(35), contentTop + sidePy(266), sidePx(235), WHITE, contentTop + sidePy(309));
++        String own = selected.isBlank() ? "AÚN NO HAS APOSTADO"
++                : betLabel(selected).toUpperCase(java.util.Locale.ROOT) + (selectedAmount.isBlank() ? "" : " · " + selectedAmount);
++        drawIntegratedWrapped(context, own, sideX + sidePx(35), contentTop + sidePy(266), sidePx(235), WHITE, contentTop + sidePy(307));
+         if (selected.isBlank()) {
+-            context.drawTextWithShadow(textRenderer, Text.literal("Selecciona una casilla en el tapete"), sideX + sidePx(35), contentTop + sidePy(290), MUTED);
++            drawUiText(context, "Selecciona una casilla en el tapete", sideX + sidePx(35), contentTop + sidePy(291), MUTED, false);
+         }
+ 
+         List<String> players = state.players() == null ? List.of() : state.players();
+-        String playerCount = Integer.toString(players.size());
+-        context.drawTextWithShadow(textRenderer, Text.literal(playerCount), sideX + sideW - sidePx(31), contentTop + sidePy(331), 0xFFFFD45A);
++        renderPlayerCount(context, players.size());
+         drawPlayers(context, contentTop + sidePy(365), contentTop + sidePy(449));
+ 
+-        drawWrapped(context, safe(state.tableState(), "Mesa lista para una nueva ronda."), sideX + sidePx(33), contentTop + sidePy(507), sidePx(222), WHITE, contentTop + sidePy(548));
++        drawIntegratedWrapped(context, safe(state.tableState(), "Mesa lista para una nueva ronda."),
++                sideX + sidePx(33), contentTop + sidePy(507), sidePx(222), WHITE, contentTop + sidePy(548));
++    }
++
++    private void renderHeaderBalance(DrawContext context) {
++        // The HD header already contains the coin and an empty burgundy balance capsule.
++        int x = panelX + headerPx(1176);
++        int w = Math.max(76, headerPx(172));
++        int y = panelY + headerPy(72);
++        String value = state.balance() + " Michicoins";
++        drawCenteredUiText(context, value, x + w / 2, y, 0xFFFFDF62, true);
++    }
++
++    private void renderRoundState(DrawContext context) {
++        int x = sideX + sidePx(29);
++        int y = contentTop + sidePy(48);
++        int w = sidePx(238);
++        // Keep this within the empty section body rather than floating over the section title.
++        context.fill(x, y, x + w, y + sidePy(25), 0xE80C0A15);
++        outline(context, x, y, w, sidePy(25), 0xFF72552D);
++        drawUiText(context, phaseLabel(), x + sidePx(9), y + sidePy(7), isBettingPhase() ? 0xFF8CF0AF : 0xFFFFDB68, true);
++        String timer = timerOnly();
++        if (!timer.isBlank()) {
++            int tx = x + w - sidePx(10) - textRenderer.getWidth(timer);
++            drawUiText(context, timer, tx, y + sidePy(7), 0xFFFFE9A1, true);
++        }
++    }
++
++    private void renderWagerAmount(DrawContext context) {
++        int x = sideX + sidePx(62);
++        int y = contentTop + sidePy(145);
++        int w = Math.max(76, sidePx(178));
++        int h = Math.max(16, sidePy(27));
++
++        // Paint only inside the slot, leaving the generated beveled border and +/- arrows visible.
++        context.fill(x + 2, y + 2, x + w - 2, y + h - 2, 0xFF07101F);
++        String value = amountField == null ? startAmount() : amountField.getText();
++        int textY = y + Math.max(4, (h - 8) / 2);
++        int textX = x + sidePx(10);
++        drawUiText(context, value, textX, textY, 0xFFF7F0E4, true);
++
++        if (amountField != null && amountField.isFocused() && ((System.currentTimeMillis() / 450L) & 1L) == 0L) {
++            int caretX = Math.min(x + w - sidePx(8), textX + textRenderer.getWidth(value) + 1);
++            context.fill(caretX, textY - 1, caretX + 1, textY + 10, 0xFFFFE7A0);
++        }
++    }
++
++    private void renderPlayerCount(DrawContext context, int count) {
++        // alpha.47's visual source had a baked-in "0/8". Cover only that text and replace it
++        // with the live participant count; the blue players icon remains untouched.
++        int x = sideX + sidePx(236);
++        int y = contentTop + sidePy(326);
++        int w = sidePx(48);
++        int h = sidePy(27);
++        context.fill(x, y, x + w, y + h, 0xFF61052E);
++        String value = count + "/" + ROULETTE_DISPLAY_CAPACITY;
++        drawCenteredUiText(context, value, x + w / 2, y + sidePy(7), 0xFFFFD85B, true);
++    }
++
++    private void drawUiText(DrawContext context, String value, int x, int y, int color, boolean bold) {
++        Text text = bold ? Text.literal(value).formatted(Formatting.BOLD) : Text.literal(value);
++        context.drawTextWithShadow(textRenderer, text, x, y, color);
++    }
++
++    private void drawCenteredUiText(DrawContext context, String value, int centerX, int y, int color, boolean bold) {
++        Text text = bold ? Text.literal(value).formatted(Formatting.BOLD) : Text.literal(value);
++        context.drawTextWithShadow(textRenderer, text, centerX - textRenderer.getWidth(text) / 2, y, color);
++    }
++
++    private int drawIntegratedWrapped(DrawContext context, String value, int x, int y, int width, int color, int maxY) {
++        if (value == null || value.isBlank()) return y;
++        for (var line : textRenderer.wrapLines(Text.literal(value), width)) {
++            if (y > maxY) break;
++            context.drawTextWithShadow(textRenderer, line, x, y, color);
++            y += 13;
++        }
++        return y;
+     }
+ 
+     private void drawRouletteWheel(DrawContext context) {
+@@ -406,24 +500,36 @@
+ 
+     private void drawRecentResults(DrawContext context) {
+         List<Integer> recent = state.recentResults() == null ? List.of() : state.recentResults();
+-        int box = Math.max(18, leftPx(25));
+-        int gap = Math.max(2, leftPx(4));
+-        int y = contentTop + leftPy(88);
+-        int total = Math.min(5, recent.size()) * box + Math.max(0, Math.min(5, recent.size()) - 1) * gap;
+-        int center = gameX + leftPx(638);
+-        if (recent.isEmpty()) {
+-            context.drawCenteredTextWithShadow(textRenderer, Text.literal("—"), center, y + 7, MUTED);
++        int x = gameX + leftPx(558);
++        int y = contentTop + leftPy(54);
++        int w = leftPx(145);
++        int h = leftPy(69);
++
++        // Dedicated data well: the generated panel remains the frame, while this clean inner well
++        // prevents roulette results from sitting on top of ornamental/source text.
++        context.fill(x, y, x + w, y + h, 0xE80D432F);
++        outline(context, x, y, w, h, 0xFFB98A35);
++        drawCenteredUiText(context, "ÚLTIMOS", x + w / 2, y + leftPy(8), 0xFFFFD76A, true);
++
++        int count = Math.min(5, recent.size());
++        if (count == 0) {
++            drawCenteredUiText(context, "—", x + w / 2, y + leftPy(36), MUTED, true);
+             return;
+         }
+-        int startX = center - total / 2;
+-        for (int i = 0; i < Math.min(5, recent.size()); i++) {
++
++        int box = Math.max(14, leftPx(20));
++        int gap = Math.max(2, leftPx(3));
++        int total = count * box + Math.max(0, count - 1) * gap;
++        int startX = x + (w - total) / 2;
++        int rowY = y + leftPy(31);
++        for (int i = 0; i < count; i++) {
+             int number = recent.get(i);
+             int bx = startX + i * (box + gap);
+             int color = number == 0 ? 0xFF07854D : RED_NUMBERS.contains(number) ? 0xFFD92735 : 0xFF171318;
+-            drawCircle(context, bx + box / 2, y + box / 2, box / 2, color);
+-            drawCircleOutline(context, bx + box / 2, y + box / 2, box / 2, i == 0 ? GOLD : 0xFFD39A39);
++            drawCircle(context, bx + box / 2, rowY + box / 2, box / 2, color);
++            drawCircleOutline(context, bx + box / 2, rowY + box / 2, box / 2, i == 0 ? GOLD : 0xFFD39A39);
+             String label = Integer.toString(number);
+-            context.drawTextWithShadow(textRenderer, Text.literal(label), bx + (box - textRenderer.getWidth(label)) / 2, y + (box - 8) / 2, WHITE);
++            drawCenteredUiText(context, label, bx + box / 2, rowY + Math.max(2, (box - 8) / 2), WHITE, true);
+         }
+     }
+ 
+@@ -714,6 +820,9 @@
+     private int sidePx(int px) { return Math.max(1, Math.round(px * sideW / (float)ROULETTE_SIDE_W)); }
+     private int sidePy(int py) { return Math.max(1, Math.round(py * rouletteContentH / (float)ROULETTE_SIDE_H)); }
+ 
++    private int headerPx(int px) { return Math.max(1, Math.round(px * panelW / (float)ROULETTE_HEADER_TEX_W)); }
++    private int headerPy(int py) { return Math.max(1, Math.round(py * rouletteHeaderH / (float)ROULETTE_HEADER_TEX_H)); }
++
+     private void drawAsset(DrawContext context, Identifier texture, int x, int y, int w, int h, int textureW, int textureH) {
+         context.drawTexture(texture, x, y, w, h, 0.0F, 0.0F, textureW, textureH, textureW, textureH);
+     }
