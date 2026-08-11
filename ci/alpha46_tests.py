@@ -1,15 +1,102 @@
 from pathlib import Path
-import base64
-root=Path('.')
+
+root = Path('.')
 
 # Fabric/Yarn 1.21.1 TextFieldWidget has no setTextShadow API. Keep the transparent
 # wager field from the asset-backed layout and remove only that unsupported cosmetic call.
-screen_path=root/'src/client/java/com/emipokemon/client/casino/CasinoScreen.java'
-screen_source=screen_path.read_text().replace('        amountField.setTextShadow(true);\n','')
+screen_path = root / 'src/client/java/com/emipokemon/client/casino/CasinoScreen.java'
+screen_source = screen_path.read_text().replace('        amountField.setTextShadow(true);\n', '')
 screen_path.write_text(screen_source)
 
-for p in (root/'src/test/java').rglob('*.java'):
-    s=p.read_text().replace('0.4.0-alpha.45','0.4.0-alpha.46').replace('alpha45VersionIsConsistent','alpha46VersionIsConsistent')
+# Advance inherited version checks.
+for p in (root / 'src/test/java').rglob('*.java'):
+    s = p.read_text()
+    s = s.replace('0.4.0-alpha.45', '0.4.0-alpha.46')
+    s = s.replace('alpha45VersionIsConsistent', 'alpha46VersionIsConsistent')
     p.write_text(s)
-p=root/'src/test/java/com/emipokemon/casino/CasinoRoulettePresentationRegressionTest.java'
-p.write_bytes(base64.b64decode('cGFja2FnZSBjb20uZW1pcG9rZW1vbi5jYXNpbm87CgppbXBvcnQgb3JnLmp1bml0Lmp1cGl0ZXIuYXBpLlRlc3Q7CgppbXBvcnQgamF2YS5uaW8uZmlsZS5GaWxlczsKaW1wb3J0IGphdmEubmlvLmZpbGUuUGF0aDsKCmltcG9ydCBzdGF0aWMgb3JnLmp1bml0Lmp1cGl0ZXIuYXBpLkFzc2VydGlvbnMuKjsKCmNsYXNzIENhc2lub1JvdWxldHRlUHJlc2VudGF0aW9uUmVncmVzc2lvblRlc3QgewogICAgcHJpdmF0ZSBTdHJpbmcgc2NyZWVuKCkgdGhyb3dzIEV4Y2VwdGlvbiB7CiAgICAgICAgcmV0dXJuIEZpbGVzLnJlYWRTdHJpbmcoUGF0aC5vZigic3JjL2NsaWVudC9qYXZhL2NvbS9lbWlwb2tlbW9uL2NsaWVudC9jYXNpbm8vQ2FzaW5vU2NyZWVuLmphdmEiKSk7CiAgICB9CgogICAgcHJpdmF0ZSBTdHJpbmcgc2VydmVyKCkgdGhyb3dzIEV4Y2VwdGlvbiB7CiAgICAgICAgcmV0dXJuIEZpbGVzLnJlYWRTdHJpbmcoUGF0aC5vZigic3JjL21haW4vamF2YS9jb20vZW1pcG9rZW1vbi9jYXNpbm8vQ2FzaW5vVGFibGVTZXJ2aWNlLmphdmEiKSk7CiAgICB9CgogICAgcHJpdmF0ZSBTdHJpbmcgbmV0d29ya2luZygpIHRocm93cyBFeGNlcHRpb24gewogICAgICAgIHJldHVybiBGaWxlcy5yZWFkU3RyaW5nKFBhdGgub2YoInNyYy9tYWluL2phdmEvY29tL2VtaXBva2Vtb24vY2FzaW5vL0Nhc2lub05ldHdvcmtpbmcuamF2YSIpKTsKICAgIH0KCiAgICBAVGVzdAogICAgdm9pZCBhcHByb3ZlZFJvdWxldHRlVXNlc0Fzc2V0QmFja2VkQ2hyb21lQW5kTWFwcGVkSGl0Ym94ZXMoKSB0aHJvd3MgRXhjZXB0aW9uIHsKICAgICAgICBTdHJpbmcgcyA9IHNjcmVlbigpOwogICAgICAgIGFzc2VydFRydWUocy5jb250YWlucygiUk9VTEVUVEVfSEVBREVSIikpOwogICAgICAgIGFzc2VydFRydWUocy5jb250YWlucygiUk9VTEVUVEVfTEVGVF9QQU5FTCIpKTsKICAgICAgICBhc3NlcnRUcnVlKHMuY29udGFpbnMoIlJPVUxFVFRFX1NJREVfUEFORUwiKSk7CiAgICAgICAgYXNzZXJ0VHJ1ZShzLmNvbnRhaW5zKCJST1VMRVRURV9XSEVFTF9PVVRFUiIpKTsKICAgICAgICBhc3NlcnRUcnVlKHMuY29udGFpbnMoIlJPVUxFVFRFX01FREFMTElPTiIpKTsKICAgICAgICBhc3NlcnRUcnVlKHMuY29udGFpbnMoImxlZnRQeCgyOTIpIikpOwogICAgICAgIGFzc2VydFRydWUocy5jb250YWlucygic2lkZVB5KDE4NCkiKSk7CiAgICAgICAgYXNzZXJ0VHJ1ZShzLmNvbnRhaW5zKCJzZW5kKGNlbGwuYWN0aW9uKSIpKTsKICAgIH0KCiAgICBAVGVzdAogICAgdm9pZCByb3VsZXR0ZUFzc2V0c0V4aXN0QW5kQXJlTm9uRW1wdHkoKSB0aHJvd3MgRXhjZXB0aW9uIHsKICAgICAgICBQYXRoIGJhc2U9UGF0aC5vZigic3JjL21haW4vcmVzb3VyY2VzL2Fzc2V0cy9lbWlwb2tlbW9uL3RleHR1cmVzL2d1aS9jYXNpbm8iKTsKICAgICAgICBmb3IgKFN0cmluZyBuYW1lIDogbmV3IFN0cmluZ1tdeyJyb3VsZXR0ZV9oZWFkZXIucG5nIiwicm91bGV0dGVfbGVmdF9wYW5lbC5wbmciLCJyb3VsZXR0ZV9zaWRlX3BhbmVsLnBuZyIsInJvdWxldHRlX3doZWVsX291dGVyLnBuZyIsInJvdWxldHRlX21lZGFsbGlvbi5wbmcifSkgewogICAgICAgICAgICBQYXRoIHA9YmFzZS5yZXNvbHZlKG5hbWUpOwogICAgICAgICAgICBhc3NlcnRUcnVlKEZpbGVzLmlzUmVndWxhckZpbGUocCksICJtaXNzaW5nICIrbmFtZSk7CiAgICAgICAgICAgIGFzc2VydFRydWUoRmlsZXMuc2l6ZShwKT4xMDI0LCAiYXNzZXQgdW5leHBlY3RlZGx5IHRpbnkgIituYW1lKTsKICAgICAgICB9CiAgICB9CgogICAgQFRlc3QKICAgIHZvaWQgcmVzdWx0SGlzdG9yeUlzUmVhbFNlcnZlckJhY2tlZFN0YXRlUmF0aGVyVGhhbkRlY29yYXRpb24oKSB0aHJvd3MgRXhjZXB0aW9uIHsKICAgICAgICBTdHJpbmcgc2VydmVyID0gc2VydmVyKCk7CiAgICAgICAgU3RyaW5nIG5ldHdvcmtpbmcgPSBuZXR3b3JraW5nKCk7CiAgICAgICAgU3RyaW5nIHNjcmVlbiA9IHNjcmVlbigpOwogICAgICAgIGFzc2VydFRydWUoc2VydmVyLmNvbnRhaW5zKCJyb3VsZXR0ZUhpc3RvcnkuYWRkRmlyc3QobnVtYmVyKSIpKTsKICAgICAgICBhc3NlcnRUcnVlKHNlcnZlci5jb250YWlucygicm91bGV0dGVIaXN0b3J5LnNpemUoKSA+IDUiKSk7CiAgICAgICAgYXNzZXJ0VHJ1ZShzZXJ2ZXIuY29udGFpbnMoIkxpc3QuY29weU9mKHNlc3Npb24ucm91bGV0dGVIaXN0b3J5KSIpKTsKICAgICAgICBhc3NlcnRUcnVlKG5ldHdvcmtpbmcuY29udGFpbnMoIkxpc3Q8SW50ZWdlcj4gcmVjZW50UmVzdWx0cyIpKTsKICAgICAgICBhc3NlcnRUcnVlKHNjcmVlbi5jb250YWlucygic3RhdGUucmVjZW50UmVzdWx0cygpIikpOwogICAgfQoKICAgIEBUZXN0CiAgICB2b2lkIHF1aWNrQ2hpcHNTdGlsbENvbnRyb2xUaGVSZWFsV2FnZXJGaWVsZCgpIHRocm93cyBFeGNlcHRpb24gewogICAgICAgIFN0cmluZyBzID0gc2NyZWVuKCk7CiAgICAgICAgYXNzZXJ0VHJ1ZShzLmNvbnRhaW5zKCJRdWlja0NoaXBab25lIikpOwogICAgICAgIGFzc2VydFRydWUocy5jb250YWlucygic2V0UXVpY2tBbW91bnQoY2hpcC5tdWx0aXBsaWVyKSIpKTsKICAgICAgICBhc3NlcnRUcnVlKHMuY29udGFpbnMoImFtb3VudEZpZWxkLnNldFRleHQoTG9uZy50b1N0cmluZyhhbW91bnQpKSIpKTsKICAgICAgICBhc3NlcnRUcnVlKHMuY29udGFpbnMoInNldERyYXdzQmFja2dyb3VuZChmYWxzZSkiKSk7CiAgICB9CgogICAgQFRlc3QKICAgIHZvaWQgYWxwaGE0NlN0aWxsS2VlcHNOb0JsdXJDb250cmFjdCgpIHRocm93cyBFeGNlcHRpb24gewogICAgICAgIFN0cmluZyBzID0gc2NyZWVuKCk7CiAgICAgICAgYXNzZXJ0VHJ1ZShzLmNvbnRhaW5zKCJwdWJsaWMgdm9pZCByZW5kZXJCYWNrZ3JvdW5kKERyYXdDb250ZXh0IGNvbnRleHQiKSk7CiAgICAgICAgYXNzZXJ0VHJ1ZShzLmNvbnRhaW5zKCJEZWxpYmVyYXRlbHkgZW1wdHk6IHRoZSBjYXNpbm8gZHJhd3MgaXRzIG93biBkaW0gYmFja2Ryb3AiKSk7CiAgICAgICAgYXNzZXJ0RmFsc2Uocy5jb250YWlucygiICAgICAgICByZW5kZXJCYWNrZ3JvdW5kKGNvbnRleHQsIG1vdXNlWCwgbW91c2VZLCBkZWx0YSk7IikpOwogICAgfQp9Cg=='))
+
+p = root / 'src/test/java/com/emipokemon/casino/CasinoRoulettePresentationRegressionTest.java'
+p.write_text(r'''package com.emipokemon.casino;
+
+import org.junit.jupiter.api.Test;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class CasinoRoulettePresentationRegressionTest {
+    private String screen() throws Exception {
+        return Files.readString(Path.of("src/client/java/com/emipokemon/client/casino/CasinoScreen.java"));
+    }
+
+    private String server() throws Exception {
+        return Files.readString(Path.of("src/main/java/com/emipokemon/casino/CasinoTableService.java"));
+    }
+
+    private String networking() throws Exception {
+        return Files.readString(Path.of("src/main/java/com/emipokemon/casino/CasinoNetworking.java"));
+    }
+
+    @Test
+    void approvedRouletteUsesAssetBackedChromeAndRealMappedHitboxes() throws Exception {
+        String s = screen();
+        assertTrue(s.contains("ROULETTE_HEADER"));
+        assertTrue(s.contains("ROULETTE_LEFT_PANEL"));
+        assertTrue(s.contains("ROULETTE_SIDE_PANEL"));
+        assertTrue(s.contains("ROULETTE_WHEEL_OUTER"));
+        assertTrue(s.contains("ROULETTE_MEDALLION"));
+        assertTrue(s.contains("drawAsset(context, ROULETTE_WHEEL_OUTER"));
+        assertTrue(s.contains("drawAsset(context, ROULETTE_MEDALLION"));
+        assertTrue(s.contains("buildRouletteCells"));
+        assertTrue(s.contains("leftPx("));
+        assertTrue(s.contains("sidePy("));
+        assertTrue(s.contains("send(cell.action)"));
+    }
+
+    @Test
+    void rouletteAssetsExistAndAreNonEmpty() throws Exception {
+        Path base = Path.of("src/main/resources/assets/emipokemon/textures/gui/casino");
+        for (String name : new String[]{
+                "roulette_header.png",
+                "roulette_left_panel.png",
+                "roulette_side_panel.png",
+                "roulette_wheel_outer.png",
+                "roulette_medallion.png"}) {
+            Path asset = base.resolve(name);
+            assertTrue(Files.isRegularFile(asset), "missing " + name);
+            assertTrue(Files.size(asset) > 1024, "asset unexpectedly tiny " + name);
+        }
+    }
+
+    @Test
+    void resultHistoryIsRealServerBackedStateRatherThanDecoration() throws Exception {
+        String server = server();
+        String networking = networking();
+        String screen = screen();
+        assertTrue(server.contains("rouletteHistory.addFirst(number)"));
+        assertTrue(server.contains("rouletteHistory.size() > 5"));
+        assertTrue(server.contains("List.copyOf(session.rouletteHistory)"));
+        assertTrue(networking.contains("List<Integer> recentResults"));
+        assertTrue(screen.contains("state.recentResults()"));
+    }
+
+    @Test
+    void quickChipsStillControlTheRealWagerFieldAndBetsStayAuthoritative() throws Exception {
+        String s = screen();
+        assertTrue(s.contains("QuickChipZone"));
+        assertTrue(s.contains("setQuickAmount(chip.multiplier)"));
+        assertTrue(s.contains("amountField.setText(Long.toString(amount))"));
+        assertTrue(s.contains("amountField.setDrawsBackground(false)"));
+        assertTrue(s.contains("send(cell.action)"));
+    }
+
+    @Test
+    void alpha46StillKeepsNoBlurContract() throws Exception {
+        String s = screen();
+        assertTrue(s.contains("public void renderBackground(DrawContext context"));
+        assertTrue(s.contains("Deliberately empty: the casino draws its own dim backdrop"));
+        assertFalse(s.contains("        renderBackground(context, mouseX, mouseY, delta);"));
+    }
+}
+''')
