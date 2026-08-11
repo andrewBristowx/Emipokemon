@@ -1,0 +1,189 @@
+name: alpha47-hd-roulette-build-registered
+
+on:
+  push:
+    branches: [release/0.4.0-alpha.47]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Report run start on PR 27
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr comment 27 --repo andrewBristowx/Emipokemon --body "ALPHA47_BUILD_STARTED run_id=${GITHUB_RUN_ID} head_sha=${GITHUB_SHA}"
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Download exact alpha.27 source baseline
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 3 --retry-delay 2 \
+            'https://drive.usercontent.google.com/download?id=1hW1-TH2UK6c2BIwZae7ux6zSM3opL10N&export=download&confirm=t' \
+            -o alpha27-source.zip
+          echo 'a7e5545668760f84d036ee017622d32d9b8fa0ffe4b77cfdae10d40c820abf4b  alpha27-source.zip' | sha256sum -c -
+          rm -rf work ci-history
+          mkdir work ci-history
+          unzip -q alpha27-source.zip -d work
+
+      - name: Download native-HD alpha.47 roulette assets
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 3 --retry-delay 2 \
+            'https://drive.usercontent.google.com/download?id=10QMbMlFJe8Xa66ig_r__A45na3xEpwK7&export=download&confirm=t' \
+            -o alpha47-hd-assets.zip
+          echo 'a32eb9169640a07085aa53afae103500471782c821ab1c914317df4de4075700  alpha47-hd-assets.zip' | sha256sum -c -
+
+      - name: Fetch exact historical transforms and isolated alpha42 model fix
+        shell: bash
+        run: |
+          set -euxo pipefail
+          base34='https://raw.githubusercontent.com/andrewBristowx/Emipokemon/2494bdfcbaa1b282962178d67d82ad136b404811/ci'
+          for f in alpha29_apply.py alpha30_apply.py alpha31_apply.py alpha31_compile_fix.py alpha32_client_path.py alpha32_apply.py alpha33_apply.py alpha34_apply.py alpha34_test_fix.py; do
+            curl -fL --retry 3 "$base34/$f" -o "ci-history/$f"
+          done
+          curl -fL --retry 3 'https://raw.githubusercontent.com/andrewBristowx/Emipokemon/56eca300953a194b13596c17f064430c7f383ded/ci/alpha35_apply.py' -o ci-history/alpha35_apply.py
+          curl -fL --retry 3 'https://raw.githubusercontent.com/andrewBristowx/Emipokemon/0691f7206a9bf6674c9843fc339d43de2e96aca9/ci/alpha41_models.py' -o ci-history/alpha42_models_fix.py
+
+      - name: Reconstruct alpha.46 and apply alpha.47 HD pass
+        shell: bash
+        working-directory: work
+        run: |
+          set -euxo pipefail
+          python3 "$GITHUB_WORKSPACE/ci-history/alpha29_apply.py"
+          python3 "$GITHUB_WORKSPACE/ci-history/alpha30_apply.py"
+          python3 "$GITHUB_WORKSPACE/ci-history/alpha31_apply.py"
+          python3 "$GITHUB_WORKSPACE/ci-history/alpha31_compile_fix.py"
+          python3 "$GITHUB_WORKSPACE/ci-history/alpha32_client_path.py"
+          python3 "$GITHUB_WORKSPACE/ci-history/alpha32_apply.py"
+          rm -f src/client/java/com/emipokemon/EmipokemonClient.java
+          python3 "$GITHUB_WORKSPACE/ci-history/alpha33_apply.py"
+          python3 "$GITHUB_WORKSPACE/ci-history/alpha34_apply.py"
+          python3 "$GITHUB_WORKSPACE/ci-history/alpha34_test_fix.py"
+          python3 "$GITHUB_WORKSPACE/ci-history/alpha35_apply.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha36_server.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha36_client.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha36_visual.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha36_tests.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha37_core.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha37_visual.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha37_tests.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha38_core.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha38_models.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha38_textures.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha38_tests.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha39_core.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha39_models.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha39_compile_fix.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha39_textures.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha39_tests.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha40_core.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha40_models.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha40_tests.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha42_core.py"
+          python3 "$GITHUB_WORKSPACE/ci-history/alpha42_models_fix.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha42_model_followup.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha42_tests.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha43_core.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha43_server.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha43_client.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha43_tests.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha44_core.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha44_tests.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha45_core.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha45_server.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha45_client.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha45_tests.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha46_core.py"
+          mkdir -p src/main/resources/assets/emipokemon/textures/gui/casino
+          cp "$GITHUB_WORKSPACE"/src/main/resources/assets/emipokemon/textures/gui/casino/roulette_header.png src/main/resources/assets/emipokemon/textures/gui/casino/
+          cp "$GITHUB_WORKSPACE"/src/main/resources/assets/emipokemon/textures/gui/casino/roulette_left_panel.png src/main/resources/assets/emipokemon/textures/gui/casino/
+          cp "$GITHUB_WORKSPACE"/src/main/resources/assets/emipokemon/textures/gui/casino/roulette_side_panel.png src/main/resources/assets/emipokemon/textures/gui/casino/
+          cp "$GITHUB_WORKSPACE"/src/main/resources/assets/emipokemon/textures/gui/casino/roulette_wheel_outer.png src/main/resources/assets/emipokemon/textures/gui/casino/
+          cp "$GITHUB_WORKSPACE"/src/main/resources/assets/emipokemon/textures/gui/casino/roulette_medallion.png src/main/resources/assets/emipokemon/textures/gui/casino/
+          gzip -dc "$GITHUB_WORKSPACE/ci/alpha46_CasinoScreen.java.gz" > src/client/java/com/emipokemon/client/casino/CasinoScreen.java
+          python3 "$GITHUB_WORKSPACE/ci/alpha46_tests.py"
+          unzip -qo "$GITHUB_WORKSPACE/alpha47-hd-assets.zip" -d src/main/resources/assets/emipokemon/textures/gui/casino
+          python3 "$GITHUB_WORKSPACE/ci/alpha47_core.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha47_tests.py"
+
+      - name: Verify alpha.47 HD invariants
+        shell: bash
+        run: |
+          set -euxo pipefail
+          grep -q '^mod_version=0.4.0-alpha.47' work/gradle.properties
+          grep -q 'ROULETTE_LEFT_TEX_W = 1052' work/src/client/java/com/emipokemon/client/casino/CasinoScreen.java
+          grep -q 'ROULETTE_HEADER_TEX_W = 1535' work/src/client/java/com/emipokemon/client/casino/CasinoScreen.java
+          grep -q 'rouletteHeaderH = Math.max(52' work/src/client/java/com/emipokemon/client/casino/CasinoScreen.java
+          grep -q 'send(cell.action)' work/src/client/java/com/emipokemon/client/casino/CasinoScreen.java
+          grep -q 'state.recentResults()' work/src/client/java/com/emipokemon/client/casino/CasinoScreen.java
+          grep -q 'public void renderBackground(DrawContext context' work/src/client/java/com/emipokemon/client/casino/CasinoScreen.java
+          grep -q 'rouletteHistory.addFirst(number)' work/src/main/java/com/emipokemon/casino/CasinoTableService.java
+
+      - name: Normalize Gradle wrapper
+        shell: bash
+        working-directory: work
+        run: |
+          sed -i 's/\r$//' gradlew
+          chmod +x gradlew
+
+      - name: Test and build with Java 21
+        shell: bash
+        working-directory: work
+        run: ./gradlew clean test build --no-daemon --stacktrace
+
+      - name: Verify built version and generate checksums
+        shell: bash
+        run: |
+          set -euxo pipefail
+          test -f work/build/libs/emipokemon-0.4.0-alpha.47.jar
+          unzip -p work/build/libs/emipokemon-0.4.0-alpha.47.jar fabric.mod.json | grep -q '0.4.0-alpha.47'
+          sha256sum work/build/libs/*.jar | tee SHA256SUMS-0.4.0-alpha.47-github.txt
+          cd work
+          zip -qr ../Emipokemon-0.4.0-alpha.47-source.zip . -x 'build/*' '.gradle/*'
+          cd ..
+          sha256sum Emipokemon-0.4.0-alpha.47-source.zip >> SHA256SUMS-0.4.0-alpha.47-github.txt
+
+      - name: Upload alpha.47 build
+        uses: actions/upload-artifact@v4
+        with:
+          name: Emipokemon-0.4.0-alpha.47-github-build
+          path: |
+            work/build/libs/*.jar
+            Emipokemon-0.4.0-alpha.47-source.zip
+            SHA256SUMS-0.4.0-alpha.47-github.txt
+          if-no-files-found: error
+
+      - name: Report successful build on PR 27
+        if: success()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo 'ALPHA47_BUILD_SUCCESS'
+            echo "run_id=${GITHUB_RUN_ID}"
+            echo "head_sha=${GITHUB_SHA}"
+            cat SHA256SUMS-0.4.0-alpha.47-github.txt
+          } > alpha47-pr-comment.txt
+          gh pr comment 27 --repo andrewBristowx/Emipokemon --body-file alpha47-pr-comment.txt
