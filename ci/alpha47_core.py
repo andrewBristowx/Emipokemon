@@ -7,6 +7,12 @@ s=gp.read_text()
 s=s.replace('mod_version=0.4.0-alpha.46','mod_version=0.4.0-alpha.47')
 gp.write_text(s)
 
+# Keep the runtime version marker aligned with gradle.properties. Historical casino
+# regression tests deliberately check both values to catch mismatched release builds.
+core=root/'src/main/java/com/emipokemon/Emipokemon.java'
+s=core.read_text().replace('0.4.0-alpha.46','0.4.0-alpha.47')
+core.write_text(s)
+
 screen=root/'src/client/java/com/emipokemon/client/casino/CasinoScreen.java'
 s=screen.read_text()
 # Native-HD source dimensions. The logical layout stays the same; only texture detail increases.
@@ -24,7 +30,7 @@ s=s.replace('        rouletteContentH = Math.max(360, panelH - 84);','        ro
 s=s.replace('            drawAsset(context, ROULETTE_HEADER, panelX, panelY, panelW, 76, ROULETTE_HEADER_TEX_W, ROULETTE_HEADER_TEX_H);','            drawAsset(context, ROULETTE_HEADER, panelX, panelY, panelW, rouletteHeaderH, ROULETTE_HEADER_TEX_W, ROULETTE_HEADER_TEX_H);')
 s=s.replace('drawAsset(context, ROULETTE_WHEEL_OUTER, wheelCx - outerRadius, wheelCy - outerRadius, trimSize, trimSize, 128, 128);','drawAsset(context, ROULETTE_WHEEL_OUTER, wheelCx - outerRadius, wheelCy - outerRadius, trimSize, trimSize, ROULETTE_WHEEL_TEX_SIZE, ROULETTE_WHEEL_TEX_SIZE);')
 s=s.replace('drawAsset(context, ROULETTE_MEDALLION, wheelCx - medSize / 2, wheelCy - medSize / 2, medSize, medSize, 64, 64);','drawAsset(context, ROULETTE_MEDALLION, wheelCx - medSize / 2, wheelCy - medSize / 2, medSize, medSize, ROULETTE_MEDALLION_TEX_SIZE, ROULETTE_MEDALLION_TEX_SIZE);')
-s= s.replace('0.4.0-alpha.46','0.4.0-alpha.47')
+s=s.replace('0.4.0-alpha.46','0.4.0-alpha.47')
 screen.write_text(s)
 
 # Keep version-regression tests aligned with the new candidate.
