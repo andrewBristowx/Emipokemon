@@ -555,12 +555,12 @@ final class CasinoScreen extends Screen {
     private void drawSlotSymbol(DrawContext context, String symbol, int cx, int cy, int size) {
         String normalized = safe(symbol, "?").strip().toUpperCase();
         int symbolIndex;
-        if (normalized.contains("CEREZA") || normalized.contains("CHERRY")) symbolIndex = 0;
+        if (normalized.contains("CEREZA") || normalized.contains("CHERRY")
+                || normalized.contains("BAYA") || normalized.contains("BERRY")) symbolIndex = 0;
         else if (normalized.contains("CAMPANA") || normalized.contains("BELL")) symbolIndex = 1;
         else if (normalized.contains("ESTRELLA") || normalized.contains("STAR")) symbolIndex = 2;
-        else if (normalized.contains("BAYA") || normalized.contains("BERRY")
-                || normalized.contains("POKE") || normalized.contains("BALL")) symbolIndex = 3;
-        else symbolIndex = 4; // EMI, Jackpot and unknown legacy values always remain graphical.
+        else if (normalized.contains("JACKPOT") || normalized.contains("POKE") || normalized.contains("BALL")) symbolIndex = 3;
+        else symbolIndex = 4; // EMI and unknown legacy values always remain graphical.
         int height = Math.max(1, Math.round(size * (SLOT_SYMBOL_CELL_H / (float) SLOT_SYMBOL_CELL_W)));
         context.drawTexture(CASINO_SLOT_SYMBOLS, cx - size / 2, cy - height / 2, size, height,
                 (float)(symbolIndex * SLOT_SYMBOL_CELL_W), 0.0F,
