@@ -1,6 +1,13 @@
 from pathlib import Path
 import base64
 root=Path('.')
+
+# Fabric/Yarn 1.21.1 TextFieldWidget has no setTextShadow API. Keep the transparent
+# wager field from the asset-backed layout and remove only that unsupported cosmetic call.
+screen_path=root/'src/client/java/com/emipokemon/client/casino/CasinoScreen.java'
+screen_source=screen_path.read_text().replace('        amountField.setTextShadow(true);\n','')
+screen_path.write_text(screen_source)
+
 for p in (root/'src/test/java').rglob('*.java'):
     s=p.read_text().replace('0.4.0-alpha.45','0.4.0-alpha.46').replace('alpha45VersionIsConsistent','alpha46VersionIsConsistent')
     p.write_text(s)
