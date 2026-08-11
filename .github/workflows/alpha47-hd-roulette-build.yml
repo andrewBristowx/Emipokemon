@@ -3,12 +3,12 @@ name: alpha47-hd-roulette-build
 on:
   push:
     branches: [release/0.4.0-alpha.47]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
+  issues: write
+  pull-requests: write
 
 jobs:
   build:
@@ -163,3 +163,17 @@ jobs:
             Emipokemon-0.4.0-alpha.47-source.zip
             SHA256SUMS-0.4.0-alpha.47-github.txt
           if-no-files-found: error
+
+      - name: Report successful build on PR 27
+        if: success()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo 'ALPHA47_BUILD_SUCCESS'
+            echo "run_id=${GITHUB_RUN_ID}"
+            echo "head_sha=${GITHUB_SHA}"
+            cat SHA256SUMS-0.4.0-alpha.47-github.txt
+          } > alpha47-pr-comment.txt
+          gh pr comment 27 --repo andrewBristowx/Emipokemon --body-file alpha47-pr-comment.txt
