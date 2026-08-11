@@ -116,7 +116,7 @@ jobs:
           unzip -qo "$GITHUB_WORKSPACE/alpha47-hd-assets.zip" -d src/main/resources/assets/emipokemon/textures/gui/casino
           python3 "$GITHUB_WORKSPACE/ci/alpha47_core.py"
           python3 "$GITHUB_WORKSPACE/ci/alpha47_tests.py"
-          base64 -d "$GITHUB_WORKSPACE/ci/alpha48_CasinoScreen.java.gz.b64" | gzip -dc > src/client/java/com/emipokemon/client/casino/CasinoScreen.java
+          patch -p0 < "$GITHUB_WORKSPACE/ci/alpha48_CasinoScreen.patch"
           python3 "$GITHUB_WORKSPACE/ci/alpha48_core.py"
           python3 "$GITHUB_WORKSPACE/ci/alpha48_tests.py"
 
@@ -128,6 +128,7 @@ jobs:
           grep -q 'renderHeaderBalance(context)' work/src/client/java/com/emipokemon/client/casino/CasinoScreen.java
           grep -q 'renderWagerAmount(context)' work/src/client/java/com/emipokemon/client/casino/CasinoScreen.java
           grep -q 'renderPlayerCount(context, players.size())' work/src/client/java/com/emipokemon/client/casino/CasinoScreen.java
+          grep -q 'renderRouletteEdgeCleanup(context)' work/src/client/java/com/emipokemon/client/casino/CasinoScreen.java
           grep -q 'ROULETTE_DISPLAY_CAPACITY = 8' work/src/client/java/com/emipokemon/client/casino/CasinoScreen.java
           grep -q 'drawCenteredUiText(context, "ÚLTIMOS"' work/src/client/java/com/emipokemon/client/casino/CasinoScreen.java
           grep -q 'rouletteContentH = Math.max(334, panelH - rouletteHeaderH - 6)' work/src/client/java/com/emipokemon/client/casino/CasinoScreen.java
