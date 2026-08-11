@@ -3,6 +3,8 @@ name: alpha47-hd-roulette-build-registered
 on:
   push:
     branches: [release/0.4.0-alpha.47]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
