@@ -1,5 +1,47 @@
 from pathlib import Path
-import base64
-root=Path('.')
-p=root/'src/test/java/com/emipokemon/casino/CasinoRouletteIntegratedUiRegressionTest.java'
-p.write_bytes(base64.b64decode('cGFja2FnZSBjb20uZW1pcG9rZW1vbi5jYXNpbm87CgppbXBvcnQgb3JnLmp1bml0Lmp1cGl0ZXIuYXBpLlRlc3Q7CgppbXBvcnQgamF2YS5uaW8uZmlsZS5GaWxlczsKaW1wb3J0IGphdmEubmlvLmZpbGUuUGF0aDsKCmltcG9ydCBzdGF0aWMgb3JnLmp1bml0Lmp1cGl0ZXIuYXBpLkFzc2VydGlvbnMuKjsKCmNsYXNzIENhc2lub1JvdWxldHRlSW50ZWdyYXRlZFVpUmVncmVzc2lvblRlc3QgewogICAgcHJpdmF0ZSBTdHJpbmcgc2NyZWVuKCkgdGhyb3dzIEV4Y2VwdGlvbiB7CiAgICAgICAgcmV0dXJuIEZpbGVzLnJlYWRTdHJpbmcoUGF0aC5vZigic3JjL2NsaWVudC9qYXZhL2NvbS9lbWlwb2tlbW9uL2NsaWVudC9jYXNpbm8vQ2FzaW5vU2NyZWVuLmphdmEiKSk7CiAgICB9CgogICAgQFRlc3QKICAgIHZvaWQgZHluYW1pY0Nhc2lub0RhdGFJc0ludGVncmF0ZWRJbnRvRGVkaWNhdGVkU2xvdHMoKSB0aHJvd3MgRXhjZXB0aW9uIHsKICAgICAgICBTdHJpbmcgcyA9IHNjcmVlbigpOwogICAgICAgIGFzc2VydFRydWUocy5jb250YWlucygicmVuZGVySGVhZGVyQmFsYW5jZShjb250ZXh0KSIpKTsKICAgICAgICBhc3NlcnRUcnVlKHMuY29udGFpbnMoInJlbmRlcldhZ2VyQW1vdW50KGNvbnRleHQpIikpOwogICAgICAgIGFzc2VydFRydWUocy5jb250YWlucygicmVuZGVyUGxheWVyQ291bnQoY29udGV4dCwgcGxheWVycy5zaXplKCkpIikpOwogICAgICAgIGFzc2VydFRydWUocy5jb250YWlucygiY291bnQgKyBcIi9cIiArIFJPVUxFVFRFX0RJU1BMQVlfQ0FQQUNJVFkiKSk7CiAgICAgICAgYXNzZXJ0VHJ1ZShzLmNvbnRhaW5zKCJkcmF3Q2VudGVyZWRVaVRleHQoY29udGV4dCwgXCLDmkxUSU1PU1wiIikpOwogICAgICAgIGFzc2VydFRydWUocy5jb250YWlucygiYW1vdW50RmllbGQuaXNGb2N1c2VkKCkiKSk7CiAgICAgICAgYXNzZXJ0VHJ1ZShzLmNvbnRhaW5zKCJyb3VsZXR0ZUNvbnRlbnRIIID0IE1hdGgubWF4KDMzNCwgcGFuZWxIIC0gcm91bGV0dGVIZWFkZXJIIC0gNikiKSk7CiAgICB9CgogICAgQFRlc3QKICAgIHZvaWQgcm91bGV0dGVTdGlsbFVzZXNTZXJ2ZXJCYWNrZWRTdGF0ZUFuZEF1dGhvcml0YXRpdmVBY3Rpb25zKCkgdGhyb3dzIEV4Y2VwdGlvbiB7CiAgICAgICAgU3RyaW5nIHMgPSBzY3JlZW4oKTsKICAgICAgICBhc3NlcnRUcnVlKHMuY29udGFpbnMoInN0YXRlLmJhbGFuY2UoKSIpKTsKICAgICAgICBhc3NlcnRUcnVlKHMuY29udGFpbnMoInN0YXRlLnBsYXllcnMoKSIpKTsKICAgICAgICBhc3NlcnRUcnVlKHMuY29udGFpbnMoInN0YXRlLnJlY2VudFJlc3VsdHMoKSIpKTsKICAgICAgICBhc3NlcnRUcnVlKHMuY29udGFpbnMoInNlbmQoY2VsbC5hY3Rpb24pIikpOwogICAgICAgIGFzc2VydFRydWUocy5jb250YWlucygibmV3IENhc2lub05ldHdvcmtpbmcuQ2FzaW5vQWN0aW9uUGF5bG9hZCIpKTsKICAgIH0KCiAgICBAVGVzdAogICAgdm9pZCBub0JsdXJDb250cmFjdFJlbWFpbnNQcmVzZW50KCkgdGhyb3dzIEV4Y2VwdGlvbiB7CiAgICAgICAgU3RyaW5nIHMgPSBzY3JlZW4oKTsKICAgICAgICBhc3NlcnRUcnVlKHMuY29udGFpbnMoInB1YmxpYyB2b2lkIHJlbmRlckJhY2tncm91bmQoRHJhd0NvbnRleHQgY29udGV4dCIpKTsKICAgICAgICBhc3NlcnRUcnVlKHMuY29udGFpbnMoIkRlbGliZXJhdGVseSBlbXB0eTogdGhlIGNhc2lubyBkcmF3cyBpdHMgb3duIGRpbSBiYWNrZHJvcCIpKTsKICAgIH0KfQo='))
+root = Path('.')
+p = root / 'src/test/java/com/emipokemon/casino/CasinoRouletteIntegratedUiRegressionTest.java'
+p.write_text(r'''package com.emipokemon.casino;
+
+import org.junit.jupiter.api.Test;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class CasinoRouletteIntegratedUiRegressionTest {
+    private String screen() throws Exception {
+        return Files.readString(Path.of("src/client/java/com/emipokemon/client/casino/CasinoScreen.java"));
+    }
+
+    @Test
+    void dynamicCasinoDataIsIntegratedIntoDedicatedSlots() throws Exception {
+        String s = screen();
+        assertTrue(s.contains("renderHeaderBalance(context)"));
+        assertTrue(s.contains("renderWagerAmount(context)"));
+        assertTrue(s.contains("renderPlayerCount(context, players.size())"));
+        assertTrue(s.contains("count + \"/\" + ROULETTE_DISPLAY_CAPACITY"));
+        assertTrue(s.contains("drawCenteredUiText(context, \"ÚLTIMOS\""));
+        assertTrue(s.contains("amountField.isFocused()"));
+        assertTrue(s.contains("rouletteContentH = Math.max(334, panelH - rouletteHeaderH - 6)"));
+    }
+
+    @Test
+    void rouletteStillUsesServerBackedStateAndAuthoritativeActions() throws Exception {
+        String s = screen();
+        assertTrue(s.contains("state.balance()"));
+        assertTrue(s.contains("state.players()"));
+        assertTrue(s.contains("state.recentResults()"));
+        assertTrue(s.contains("send(cell.action)"));
+        assertTrue(s.contains("new CasinoNetworking.CasinoActionPayload"));
+    }
+
+    @Test
+    void noBlurContractRemainsPresent() throws Exception {
+        String s = screen();
+        assertTrue(s.contains("public void renderBackground(DrawContext context"));
+        assertTrue(s.contains("Deliberately empty: the casino draws its own dim backdrop"));
+    }
+}
+''')
