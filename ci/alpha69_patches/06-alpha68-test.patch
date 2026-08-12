@@ -10,7 +10,7 @@
          assertTrue(machine.contains("EMI_PINK"));
          assertTrue(renderer.contains("POKÉMON DE TEMPORADA"));
 -        assertTrue(renderer.contains("drawProfilePokemon"));
-+        assertTrue(renderer.contains("CobblemonEntities.POKEMON.create"));
++        assertTrue(renderer.contains("Class.forName(\"com.cobblemon.mod.common.CobblemonEntities\")"));
 +        assertFalse(renderer.contains("drawProfilePokemon"));
          assertTrue(source("client/java/com/emipokemon/client/render/GachaMachineRenderer.java")
                  .contains("SeasonalPokemonWorldRenderer.draw"));
