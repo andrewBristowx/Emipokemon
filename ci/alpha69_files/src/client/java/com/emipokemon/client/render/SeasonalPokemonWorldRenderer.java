@@ -1,7 +1,5 @@
 package com.emipokemon.client.render;
 
-import com.cobblemon.mod.common.CobblemonEntities;
-import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.emipokemon.Emipokemon;
 import com.emipokemon.gacha.machine.GachaMachineBlockEntity;
 import net.minecraft.client.MinecraftClient;
@@ -9,12 +7,14 @@ import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.render.LightmapTextureManager;
 import net.minecraft.client.render.VertexConsumerProvider;
 import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.entity.Entity;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.RotationAxis;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 
+import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.WeakHashMap;
 
@@ -36,7 +36,7 @@ final class SeasonalPokemonWorldRenderer {
 
         renderWorldPokemon(machine, species, partialTick, matrices, vertices, client, bob);
 
-        // Never share the quaternion with the Pokémon renderer: Cobblemon profile rendering can mutate it.
+        // Keep text orientation independent from every Pokemon/model transform.
         Quaternionf cleanCameraRotation = new Quaternionf(client.getEntityRenderDispatcher().getRotation());
         drawTextLine(matrices, vertices, textRenderer, cleanCameraRotation, 2.34D,
                 "POKÉMON DE TEMPORADA", machine.isEmiThemed() ? 0xFFFFA6E4 : 0xFF8DEBFF, -6.0F);
@@ -50,16 +50,13 @@ final class SeasonalPokemonWorldRenderer {
         try {
             CachedPokemon cached = CACHE.get(machine);
             if (cached == null || !cached.speciesId.equals(species) || cached.entity.isRemoved()) {
-                PokemonEntity entity = CobblemonEntities.POKEMON.create(machine.getWorld());
+                Entity entity = createCobblemonEntity(machine, species);
                 if (entity == null) return;
-                NbtCompound nbt = new NbtCompound();
-                nbt.putString("species", "cobblemon:" + species);
-                entity.getPokemon().loadFromNBT(nbt);
                 cached = new CachedPokemon(species, entity);
                 CACHE.put(machine, cached);
             }
 
-            PokemonEntity entity = cached.entity;
+            Entity entity = cached.entity;
             float width = Math.max(0.25F, entity.getWidth());
             float height = Math.max(0.25F, entity.getHeight());
             float fit = Math.min(0.82F, Math.min(1.45F / width, 1.35F / height));
@@ -67,7 +64,6 @@ final class SeasonalPokemonWorldRenderer {
 
             matrices.push();
             matrices.translate(0.5D, 2.62D + bob, 0.5D);
-            // Keep the display upright, but turn it toward the player around Y only.
             matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(180.0F - client.gameRenderer.getCamera().getYaw()));
             matrices.scale(fit, fit, fit);
             client.getEntityRenderDispatcher().render(entity, 0.0D, 0.0D, 0.0D,
@@ -79,6 +75,55 @@ final class SeasonalPokemonWorldRenderer {
                 Emipokemon.LOGGER.warn("Could not render the featured Cobblemon above a gacha machine", exception);
             }
         }
+    }
+
+    /**
+     * Cobblemon's PokemonEntity directly exposes several Kotlin/Mojmap interfaces that cannot be linked
+     * from this Yarn Java source-set. Create and configure it reflectively, then render it as vanilla Entity.
+     */
+    private static Entity createCobblemonEntity(GachaMachineBlockEntity machine, String species) throws Exception {
+        Class<?> entitiesClass = Class.forName("com.cobblemon.mod.common.CobblemonEntities");
+        Object pokemonEntityType = entitiesClass.getField("POKEMON").get(null);
+        Method create = null;
+        for (Method method : pokemonEntityType.getClass().getMethods()) {
+            if (method.getName().equals("create") && method.getParameterCount() == 1
+                    && method.getParameterTypes()[0].isAssignableFrom(machine.getWorld().getClass())) {
+                create = method;
+                break;
+            }
+        }
+        if (create == null) throw new NoSuchMethodException("Cobblemon EntityType#create(World)");
+        Object created = create.invoke(pokemonEntityType, machine.getWorld());
+        if (!(created instanceof Entity entity)) return null;
+
+        Object pokemon = entity.getClass().getMethod("getPokemon").invoke(entity);
+        NbtCompound nbt = new NbtCompound();
+        nbt.putString("species", "cobblemon:" + species);
+        boolean loaded = false;
+        for (Method method : pokemon.getClass().getMethods()) {
+            if (!method.getName().equals("loadFromNBT")) continue;
+            Class<?>[] params = method.getParameterTypes();
+            if (params.length == 2 && params[1].isAssignableFrom(NbtCompound.class)) {
+                method.invoke(pokemon, machine.getWorld().getRegistryManager(), nbt);
+                loaded = true;
+                break;
+            }
+            if (params.length == 1 && params[0].isAssignableFrom(NbtCompound.class)) {
+                method.invoke(pokemon, nbt);
+                loaded = true;
+                break;
+            }
+        }
+        if (!loaded) throw new NoSuchMethodException("Pokemon#loadFromNBT");
+
+        for (Method method : entity.getClass().getMethods()) {
+            if (method.getName().equals("setPokemon") && method.getParameterCount() == 1
+                    && method.getParameterTypes()[0].isInstance(pokemon)) {
+                method.invoke(entity, pokemon);
+                break;
+            }
+        }
+        return entity;
     }
 
     private static void drawTextLine(MatrixStack matrices, VertexConsumerProvider vertices, TextRenderer renderer,
@@ -106,5 +151,5 @@ final class SeasonalPokemonWorldRenderer {
         return normalized.startsWith("cobblemon:") ? normalized.substring("cobblemon:".length()) : normalized;
     }
 
-    private record CachedPokemon(String speciesId, PokemonEntity entity) { }
+    private record CachedPokemon(String speciesId, Entity entity) { }
 }
