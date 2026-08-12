@@ -47,5 +47,12 @@ for model in (
     cubes = sum(len(bone.get("cubes", [])) for bone in bones)
     assert cubes >= 46, (model, cubes)
     assert any(bone.get("name") == "alpha65_ornaments" for bone in bones)
+    if model in {"slot", "chip_exchange", "ticket_exchange", "roulette", "poker", "blackjack", "dice"}:
+        for bone in bones:
+            for cube in bone.get("cubes", []):
+                x, y, z = cube["origin"]
+                sx, sy, sz = cube["size"]
+                assert -8 <= x and x + sx <= 8, (model, "x", cube)
+                assert -8 <= z and z + sz <= 8, (model, "z", cube)
 
 print("alpha65 static checks passed")
