@@ -18,7 +18,8 @@ machine_renderer = text("src/client/java/com/emipokemon/client/render/GachaMachi
 assert "RESULT_STAGGER_MS = 135L" in screen
 assert "enableScissor" in screen and "PositionedSoundInstance.master" in screen
 assert "drawProfilePokemon" not in world
-assert "CobblemonEntities.POKEMON.create" in world
+assert 'Class.forName("com.cobblemon.mod.common.CobblemonEntities")' in world
+assert "instanceof Entity" in world
 assert "12L * 60L * 60L * 1000L" in rotation
 assert "GachaTier.LEGENDARY" in rotation
 assert "EMI_FEATURED_MULTIPLIER" in service
