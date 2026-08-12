@@ -18,7 +18,7 @@ public final class GachaCurrencyService {
 
     public Result withdraw(ServerPlayerEntity player, BannerDefinition.Currency currency) {
         if (currency == null || currency.amount <= 0 || "FREE".equalsIgnoreCase(currency.type)) {
-            return Result.success(null, 0);
+            return Result.success((Item) null, 0);
         }
         if (!"ITEM".equalsIgnoreCase(currency.type)) {
             String type = currency.type == null ? "" : currency.type.toUpperCase(java.util.Locale.ROOT);
