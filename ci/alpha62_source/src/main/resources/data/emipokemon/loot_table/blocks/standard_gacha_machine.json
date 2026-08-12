@@ -1,0 +1,1 @@
+{"type":"minecraft:block","pools":[{"bonus_rolls":0,"conditions":[{"condition":"minecraft:survives_explosion"}],"entries":[{"type":"minecraft:item","name":"emipokemon:standard_gacha_machine"}],"rolls":1}],"random_sequence":"emipokemon:blocks/standard_gacha_machine"}
