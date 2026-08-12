@@ -36,6 +36,9 @@ jobs:
           # Info-ZIP returns 1 for the archive's harmless backslash-separator
           # warning. Any stronger extraction failure remains fatal.
           test "$unzip_rc" -le 1
+          # Some directory entries carry Windows/ZIP mode bits that become
+          # 000 on Linux. Normalize only owner access for the build workspace.
+          chmod -R u+rwX work
       - name: Reconstruct exact alpha.66 candidate
         working-directory: work
         run: |
