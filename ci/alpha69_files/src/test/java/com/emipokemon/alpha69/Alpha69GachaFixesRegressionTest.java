@@ -53,7 +53,8 @@ final class Alpha69GachaFixesRegressionTest {
     @Test void seasonalWorldDisplayNoLongerUsesGuiProfileRendererOrMutatedCameraRotation() throws Exception {
         String renderer = source("client/java/com/emipokemon/client/render/SeasonalPokemonWorldRenderer.java");
         assertFalse(renderer.contains("drawProfilePokemon"));
-        assertTrue(renderer.contains("CobblemonEntities.POKEMON.create"));
+        assertTrue(renderer.contains("Class.forName(\"com.cobblemon.mod.common.CobblemonEntities\")"));
+        assertTrue(renderer.contains("instanceof Entity"));
         assertTrue(renderer.contains("getEntityRenderDispatcher().render"));
         assertTrue(renderer.contains("new Quaternionf(client.getEntityRenderDispatcher().getRotation())"));
         assertTrue(renderer.contains("1.45F / width"));
