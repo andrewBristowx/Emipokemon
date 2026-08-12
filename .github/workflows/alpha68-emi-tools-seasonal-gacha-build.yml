@@ -52,6 +52,11 @@ jobs:
         run: |
           sed -i 's/\r$//' gradlew
           chmod +x gradlew
+          for attempt in 1 2 3; do
+            if ./gradlew --version --no-daemon; then break; fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            sleep $((attempt * 5))
+          done
           ./gradlew clean test build --no-daemon --stacktrace
       - name: Verify and package candidate
         shell: bash
