@@ -1,0 +1,27 @@
+--- a/src/main/java/com/emipokemon/gacha/GachaNetworking.java
++++ b/src/main/java/com/emipokemon/gacha/GachaNetworking.java
+@@ -60,7 +60,8 @@
+         String message = "";
+         for (int index = 0; index < count; index++) {
+             GachaService.PullOutcome outcome = Emipokemon.gachaService().pullWithCurrencyOverride(
+-                    player, banner.id, currency(player, machine));
++                    player, banner.id, currency(player, machine),
++                    machine.isEmiThemed() ? machine.getFeaturedSpeciesId() : "");
+             if (!outcome.success()) {
+                 message = (results.isEmpty() ? "§c" : "§e") + outcome.error();
+                 break;
+@@ -100,8 +101,13 @@
+         GachaProgress progress = data.gacha(machine.getBannerId());
+         int epicMax = banner == null ? 0 : banner.pity.epicGuarantee;
+         int legendaryMax = banner == null ? 0 : banner.pity.hardLegendaryGuarantee;
++        String bannerName = banner == null ? machine.getBannerId() : banner.displayName;
++        if (machine.isEmiThemed() && machine.getFeaturedPokemonName() != null
++                && !machine.getFeaturedPokemonName().isBlank()) {
++            bannerName = machine.getFeaturedPokemonName() + " · Legendario de Emi";
++        }
+         return new GachaView(machine.getPos().asLong(), machine.getBannerId(),
+-                banner == null ? machine.getBannerId() : banner.displayName, emi, tickets,
++                bannerName, emi, tickets,
+                 progress.totalPulls, progress.pullsSinceEpicOrBetter, epicMax,
+                 progress.pullsSinceLegendaryOrBetter, legendaryMax,
+                 message == null ? "" : message, results);
