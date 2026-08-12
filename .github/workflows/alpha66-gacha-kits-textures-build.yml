@@ -27,22 +27,11 @@ jobs:
             'https://drive.usercontent.google.com/download?id=1U3KGE4F-Xs1NmxJOpyXALoCD-ZICMhTm&export=download&confirm=t' \
             -o alpha62-source.zip
           echo '56cdf22219db733383da8fc20db48930105167b01571d2ac381a7c1a05e5ba6b  alpha62-source.zip' | sha256sum -c -
-          python3 - <<'PY'
-          from pathlib import Path, PurePosixPath
-          from zipfile import ZipFile
-          destination = Path('work'); destination.mkdir()
-          with ZipFile('alpha62-source.zip') as archive:
-              for member in archive.infolist():
-                  relative = PurePosixPath(member.filename.replace('\\', '/'))
-                  if relative.is_absolute() or '..' in relative.parts:
-                      raise SystemExit(f'Unsafe ZIP member: {member.filename!r}')
-                  target = destination.joinpath(*relative.parts)
-                  if member.is_dir() or member.filename.endswith('/'):
-                      target.mkdir(parents=True, exist_ok=True); continue
-                  target.parent.mkdir(parents=True, exist_ok=True)
-                  with archive.open(member) as source, target.open('wb') as output:
-                      output.write(source.read())
-          PY
+          # The verified archive contains Unix symlinks (for the shared
+          # source-set directories). The platform unzip utility restores them
+          # correctly; treating them as regular files breaks later entries.
+          mkdir work
+          unzip -q alpha62-source.zip -d work
       - name: Reconstruct exact alpha.66 candidate
         working-directory: work
         run: |
