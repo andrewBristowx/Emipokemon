@@ -1,0 +1,17 @@
+--- a/src/test/java/com/emipokemon/alpha68/Alpha68EmiToolsAndSeasonDisplayRegressionTest.java
++++ b/src/test/java/com/emipokemon/alpha68/Alpha68EmiToolsAndSeasonDisplayRegressionTest.java
+@@ -80,11 +80,12 @@
+         String machine = source("main/java/com/emipokemon/gacha/machine/GachaMachineBlockEntity.java");
+         String renderer = source("client/java/com/emipokemon/client/render/SeasonalPokemonWorldRenderer.java");
+         assertTrue(machine.contains("FeaturedSpecies"));
+-        assertTrue(machine.contains("banner.featuredSpecies.entrySet()"));
++        assertTrue(machine.contains("featuredRotation()"));
+         assertTrue(machine.contains("ParticleTypes.HEART"));
+         assertTrue(machine.contains("EMI_PINK"));
+         assertTrue(renderer.contains("POKÉMON DE TEMPORADA"));
+-        assertTrue(renderer.contains("drawProfilePokemon"));
++        assertTrue(renderer.contains("CobblemonEntities.POKEMON.create"));
++        assertFalse(renderer.contains("drawProfilePokemon"));
+         assertTrue(source("client/java/com/emipokemon/client/render/GachaMachineRenderer.java")
+                 .contains("SeasonalPokemonWorldRenderer.draw"));
+     }
