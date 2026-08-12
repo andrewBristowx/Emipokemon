@@ -1,0 +1,37 @@
+--- a/src/main/java/com/emipokemon/Emipokemon.java
++++ b/src/main/java/com/emipokemon/Emipokemon.java
+@@ -9,6 +9,7 @@
+ import com.emipokemon.gacha.GachaService;
+ import com.emipokemon.gacha.GachaNetworking;
+ import com.emipokemon.gacha.banner.BannerManager;
++import com.emipokemon.gacha.banner.FeaturedRotationService;
+ import com.emipokemon.gacha.catalog.PokemonCatalogService;
+ import com.emipokemon.integration.StreamotesServerIntegration;
+ import com.emipokemon.npc.command.NpcCommands;
+@@ -46,13 +47,14 @@
+ 
+ public final class Emipokemon implements ModInitializer {
+     public static final String MOD_ID = "emipokemon";
+-    public static final String VERSION = "0.4.0-alpha.68";
++    public static final String VERSION = "0.4.0-alpha.69";
+     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
+ 
+     private static final ConfigManager CONFIG_MANAGER = new ConfigManager();
+     private static final PlayerDataManager PLAYER_DATA_MANAGER = new PlayerDataManager();
+     private static final PokemonCatalogService POKEMON_CATALOG = new PokemonCatalogService();
+     private static final BannerManager BANNER_MANAGER = new BannerManager();
++    private static final FeaturedRotationService FEATURED_ROTATION = new FeaturedRotationService(POKEMON_CATALOG);
+     private static final RewardWalletService REWARD_WALLET = new RewardWalletService(PLAYER_DATA_MANAGER);
+     private static final GachaService GACHA_SERVICE = new GachaService(
+             POKEMON_CATALOG, BANNER_MANAGER, PLAYER_DATA_MANAGER, REWARD_WALLET);
+@@ -139,6 +141,10 @@
+         return BANNER_MANAGER;
+     }
+ 
++    public static FeaturedRotationService featuredRotation() {
++        return FEATURED_ROTATION;
++    }
++
+     public static GachaService gachaService() {
+         return GACHA_SERVICE;
+     }
