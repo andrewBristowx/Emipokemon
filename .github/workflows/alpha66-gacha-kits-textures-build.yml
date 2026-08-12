@@ -31,7 +31,11 @@ jobs:
           # source-set directories). The platform unzip utility restores them
           # correctly; treating them as regular files breaks later entries.
           mkdir work
-          unzip -q alpha62-source.zip -d work
+          unzip_rc=0
+          unzip -q alpha62-source.zip -d work || unzip_rc=$?
+          # Info-ZIP returns 1 for the archive's harmless backslash-separator
+          # warning. Any stronger extraction failure remains fatal.
+          test "$unzip_rc" -le 1
       - name: Reconstruct exact alpha.66 candidate
         working-directory: work
         run: |
