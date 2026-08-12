@@ -11,9 +11,10 @@ assert "mod_version=0.4.0-alpha.65" in text("gradle.properties")
 assert "0.4.0-alpha.65" in text("src/main/java/com/emipokemon/Emipokemon.java")
 
 portrait = text("src/client/java/com/emipokemon/client/render/PokemonPortraitRenderer.java")
-assert "new FloatingState()" in portrait
-assert "PokemonGuiUtilsKt.drawProfilePokemon" in portrait
-assert "getParameterCount()" not in portrait
+assert "blockbench.FloatingState" in portrait
+assert "getDeclaredConstructor()" in portrait
+assert "getParameterCount() == 16" in portrait
+assert "1.0F, 1.0F, 1.0F, 1.0F, 0.0F, 0.0F" in portrait
 
 pass_service = text("src/main/java/com/emipokemon/rewards/BattlePassService.java")
 assert "legacy_roll_materialized" in pass_service
