@@ -1,8 +1,10 @@
 from pathlib import Path
 import shutil
+import subprocess
 
 root = Path(__file__).resolve().parents[1]
 source = root / "ci" / "alpha69_files"
+patches = root / "ci" / "alpha69_patches"
 target = Path.cwd().resolve()
 
 if not source.is_dir():
@@ -19,6 +21,14 @@ for item in source.rglob("*"):
     destination = target / relative
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(item, destination)
+
+if patches.is_dir():
+    for patch in sorted(patches.glob("*.patch")):
+        subprocess.run(
+            ["patch", "-p1", "--forward", "--batch", "--input", str(patch)],
+            cwd=target,
+            check=True,
+        )
 
 if "mod_version=0.4.0-alpha.69" not in (target / "gradle.properties").read_text(encoding="utf-8"):
     raise SystemExit("alpha69 version was not applied")
