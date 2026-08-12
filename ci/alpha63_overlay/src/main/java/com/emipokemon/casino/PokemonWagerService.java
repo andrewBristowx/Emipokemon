@@ -372,7 +372,7 @@ final class PokemonWagerService {
                 displays.add(new CasinoNetworking.PokemonDisplay(participant.name, "", "Sin selección", 0, participant.ready));
             } else {
                 displays.add(new CasinoNetworking.PokemonDisplay(participant.name,
-                        pokemon.getSpecies().getResourceIdentifier().toString(), pokemon.getSpecies().getName(),
+                        speciesIdentifier(pokemon), pokemon.getSpecies().getName(),
                         pokemon.getLevel(), participant.ready));
             }
         }
@@ -383,6 +383,19 @@ final class PokemonWagerService {
                 session.lastFlips.chars().map(ch -> ch == 'C' ? 1 : 0).boxed().toList(),
                 List.of(), -1, -1, displays);
         CasinoNetworking.sendTable(player, machine, state);
+    }
+
+    private String speciesIdentifier(Pokemon pokemon) {
+        String fallback = "cobblemon:" + pokemon.getSpecies().getName().toLowerCase(java.util.Locale.ROOT)
+                .replaceAll("[^a-z0-9_./-]", "_");
+        try {
+            Object identifier = pokemon.getSpecies().getClass().getMethod("getResourceIdentifier")
+                    .invoke(pokemon.getSpecies());
+            return identifier == null ? fallback : identifier.toString();
+        } catch (ReflectiveOperationException exception) {
+            Emipokemon.LOGGER.debug("Cobblemon species identifier adapter used for {}", fallback);
+            return fallback;
+        }
     }
 
     private void audit(MinecraftServer server, UUID playerId, String action, String detail) {

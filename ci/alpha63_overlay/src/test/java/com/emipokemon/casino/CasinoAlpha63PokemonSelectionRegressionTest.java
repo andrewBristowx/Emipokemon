@@ -15,7 +15,9 @@ final class CasinoAlpha63PokemonSelectionRegressionTest {
         String networking = source("main/java/com/emipokemon/casino/CasinoNetworking.java");
         String screen = source("client/java/com/emipokemon/client/casino/CasinoScreen.java");
         assertTrue(networking.contains("record PokemonDisplay"));
-        assertTrue(wager.contains("pokemon.getSpecies().getResourceIdentifier().toString()"));
+        assertTrue(wager.contains("speciesIdentifier(pokemon)"));
+        assertTrue(wager.contains("getMethod(\"getResourceIdentifier\")"));
+        assertTrue(wager.contains("cobblemon:"));
         assertTrue(wager.contains("pokemon.getLevel()"));
         assertTrue(screen.contains("drawPokemonFlipSelections(context)"));
         assertTrue(screen.contains("drawCobblemonPortrait"));
