@@ -1,0 +1,170 @@
+--- a/src/client/java/com/emipokemon/client/gacha/GachaScreen.java
++++ b/src/client/java/com/emipokemon/client/gacha/GachaScreen.java
+@@ -7,8 +7,12 @@
+ import net.minecraft.client.gui.DrawContext;
+ import net.minecraft.client.gui.screen.Screen;
+ import net.minecraft.client.gui.widget.ButtonWidget;
++import net.minecraft.client.sound.PositionedSoundInstance;
++import net.minecraft.sound.SoundEvent;
++import net.minecraft.sound.SoundEvents;
+ import net.minecraft.text.Text;
+ import net.minecraft.util.Identifier;
++import net.minecraft.util.Util;
+ 
+ import java.util.List;
+ 
+@@ -19,15 +23,21 @@
+     private static final Identifier NORMAL = Identifier.of(Emipokemon.MOD_ID, "textures/gui/gacha/standard_gacha.png");
+     private static final Identifier EMI = Identifier.of(Emipokemon.MOD_ID, "textures/gui/gacha/emi_gacha.png");
+ 
++    private static final long RESULT_STAGGER_MS = 135L;
++    private static final long RESULT_POP_MS = 190L;
++
+     private final Screen parent;
+     private final GachaView view;
++    private final long resultRevealStartedAt;
+     private int panelX, panelY, panelW, panelH;
+     private boolean requesting;
++    private int soundedResultCount;
+ 
+     GachaScreen(Screen parent, GachaView view) {
+         super(Text.literal("Gacha Emipokemon"));
+         this.parent = parent;
+         this.view = view;
++        this.resultRevealStartedAt = Util.getMeasuringTimeMs() + 110L;
+     }
+ 
+     Screen parent() { return parent; }
+@@ -49,8 +59,9 @@
+     }
+ 
+     private void request(int count) {
+-        if (requesting) return;
++        if (requesting || isRevealing()) return;
+         requesting = true;
++        playLocal(SoundEvents.UI_BUTTON_CLICK.value(), count == 10 ? 0.92F : 1.04F);
+         GachaClient.pull(view.blockPos(), count);
+     }
+ 
+@@ -105,13 +116,29 @@
+ 
+     private void drawResults(DrawContext context, List<ResultView> results) {
+         Layout layout = layout();
++        int visible = visibleResultCount(results);
++        updateRevealSound(results, visible);
++        if (visible <= 0) return;
++
+         if (results.size() == 1) {
+             ResultView result = results.getFirst();
+             int cx = panelX + rx(layout.stageX());
++            float pop = resultPopScale(0);
++            context.getMatrices().push();
++            context.getMatrices().translate(cx, panelY + ry(layout.singlePortraitBottomY()), 0.0F);
++            context.getMatrices().scale(pop, pop, 1.0F);
++            context.getMatrices().translate(-cx, -(panelY + ry(layout.singlePortraitBottomY())), 0.0F);
++            int clipLeft = cx - rx(205);
++            int clipRight = cx + rx(205);
++            int clipTop = panelY + ry(layout.singlePortraitBottomY() - 285);
++            int clipBottom = panelY + ry(layout.singleNameY() - 16);
++            context.enableScissor(clipLeft, clipTop, clipRight, clipBottom);
+             boolean rendered = PokemonPortraitRenderer.draw(context, result.speciesId(), cx,
+-                    panelY + ry(layout.singlePortraitBottomY()), rx(190));
++                    panelY + ry(layout.singlePortraitBottomY()), rx(150));
++            context.disableScissor();
+             if (!rendered) drawCentered(context, "◆", cx,
+                     panelY + ry(layout.singlePortraitBottomY() - 90), tierColor(result.tier()));
++            context.getMatrices().pop();
+             drawCentered(context, trim(result.name(), 28), cx,
+                     panelY + ry(layout.singleNameY()), 0xFFFFFFFF);
+             drawCentered(context, result.tier(), cx,
+@@ -120,21 +147,81 @@
+                     panelY + ry(layout.singleLevelY()), 0xFFFFFFFF);
+             return;
+         }
++
+         int columns = 5;
+-        for (int index = 0; index < Math.min(10, results.size()); index++) {
++        for (int index = 0; index < Math.min(visible, Math.min(10, results.size())); index++) {
+             ResultView result = results.get(index);
+             int col = index % columns, row = index / columns;
+             int cx = panelX + rx(layout.gridFirstX() + col * layout.gridStepX());
+             int top = panelY + ry(layout.gridTopY() + row * layout.gridStepY());
+-            context.fill(cx - rx(66), top, cx + rx(66), top + ry(216), 0xB0150D24);
+-            outline(context, cx - rx(66), top, rx(132), ry(216), tierColor(result.tier()));
+-            if (!PokemonPortraitRenderer.draw(context, result.speciesId(), cx, top + ry(126), rx(78)))
+-                drawCentered(context, "◆", cx, top + ry(66), tierColor(result.tier()));
+-            drawCentered(context, trim(result.name(), 15), cx, top + ry(154), 0xFFFFFFFF);
+-            drawCentered(context, result.tier(), cx, top + ry(178), tierColor(result.tier()));
++            float pop = resultPopScale(index);
++            int cardHalf = rx(66);
++            int cardHeight = ry(216);
++
++            context.getMatrices().push();
++            context.getMatrices().translate(cx, top + cardHeight / 2.0F, 0.0F);
++            context.getMatrices().scale(pop, pop, 1.0F);
++            context.getMatrices().translate(-cx, -(top + cardHeight / 2.0F), 0.0F);
++            context.fill(cx - cardHalf, top, cx + cardHalf, top + cardHeight, 0xB0150D24);
++            outline(context, cx - cardHalf, top, rx(132), cardHeight, tierColor(result.tier()));
++
++            // Hard clip the Cobblemon portrait to the art area. Even unusually long/large species
++            // can no longer overlap the name, rarity or level lines.
++            int clipLeft = cx - rx(61);
++            int clipRight = cx + rx(61);
++            int clipTop = top + ry(6);
++            int clipBottom = top + ry(139);
++            context.enableScissor(clipLeft, clipTop, clipRight, clipBottom);
++            boolean rendered = PokemonPortraitRenderer.draw(context, result.speciesId(), cx,
++                    top + ry(122), rx(60));
++            context.disableScissor();
++            if (!rendered) drawCentered(context, "◆", cx, top + ry(66), tierColor(result.tier()));
++            context.getMatrices().pop();
++
++            drawCentered(context, trim(result.name(), 15), cx, top + ry(151), 0xFFFFFFFF);
++            drawCentered(context, result.tier(), cx, top + ry(176), tierColor(result.tier()));
+             drawCentered(context, "Nv." + result.level() + (result.shiny() ? " ✦" : ""), cx,
+-                    top + ry(199), 0xFFFFFFFF);
+-        }
++                    top + ry(198), 0xFFFFFFFF);
++        }
++    }
++
++    private int visibleResultCount(List<ResultView> results) {
++        if (results == null || results.isEmpty()) return 0;
++        long elapsed = Util.getMeasuringTimeMs() - resultRevealStartedAt;
++        if (elapsed < 0L) return 0;
++        return Math.min(results.size(), 1 + (int) (elapsed / RESULT_STAGGER_MS));
++    }
++
++    private float resultPopScale(int index) {
++        long elapsed = Util.getMeasuringTimeMs() - resultRevealStartedAt - index * RESULT_STAGGER_MS;
++        if (elapsed <= 0L) return 0.82F;
++        float progress = Math.min(1.0F, elapsed / (float) RESULT_POP_MS);
++        // Ease-out with a tiny overshoot, enough to feel like a capsule reveal without hiding the UI.
++        float overshoot = (float) Math.sin(progress * Math.PI) * 0.08F;
++        return 0.82F + 0.18F * progress + overshoot;
++    }
++
++    private boolean isRevealing() {
++        List<ResultView> results = view.results();
++        return results != null && !results.isEmpty() && visibleResultCount(results) < results.size();
++    }
++
++    private void updateRevealSound(List<ResultView> results, int visible) {
++        if (visible <= soundedResultCount || visible <= 0 || client == null) return;
++        int index = Math.min(visible, results.size()) - 1;
++        ResultView result = results.get(index);
++        soundedResultCount = visible;
++        switch (result.tier() == null ? "" : result.tier()) {
++            case "MYTHICAL", "SPECIAL", "LEGENDARY" ->
++                    playLocal(SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, 1.02F + index * 0.015F);
++            case "EPIC", "RARE" -> playLocal(SoundEvents.BLOCK_AMETHYST_BLOCK_CHIME, 1.05F + index * 0.02F);
++            default -> playLocal(SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0F + index * 0.025F);
++        }
++    }
++
++    private void playLocal(SoundEvent sound, float pitch) {
++        if (client == null) return;
++        client.getSoundManager().play(PositionedSoundInstance.master(sound, Math.min(1.65F, pitch)));
+     }
+ 
+     private void drawEmptyStage(DrawContext context) {

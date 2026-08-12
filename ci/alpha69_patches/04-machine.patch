@@ -1,0 +1,119 @@
+--- a/src/main/java/com/emipokemon/gacha/machine/GachaMachineBlockEntity.java
++++ b/src/main/java/com/emipokemon/gacha/machine/GachaMachineBlockEntity.java
+@@ -54,6 +54,7 @@
+     private String bannerId = "rayquaza_hoenn";
+     private String featuredSpeciesId = "rayquaza";
+     private String featuredPokemonName = "Rayquaza";
++    private boolean bannerExplicitlyConfigured;
+     private GachaMachineState machineState = GachaMachineState.IDLE;
+     private GachaTier resultTier;
+     private UUID activePlayerUuid;
+@@ -64,6 +65,11 @@
+ 
+     public GachaMachineBlockEntity(BlockPos pos, BlockState state) {
+         super(ModRegistries.GACHA_MACHINE_BLOCK_ENTITY, pos, state);
++        if (state.isOf(ModRegistries.STANDARD_GACHA_MACHINE)) {
++            bannerId = "standard";
++            featuredSpeciesId = "";
++            featuredPokemonName = "";
++        }
+     }
+ 
+     public String getBannerId() {
+@@ -73,6 +79,7 @@
+     public void setBannerId(String bannerId) {
+         if (bannerId == null || bannerId.isBlank()) return;
+         this.bannerId = bannerId.toLowerCase(Locale.ROOT);
++        this.bannerExplicitlyConfigured = true;
+         refreshFeaturedPokemon();
+         markAndSync();
+     }
+@@ -126,7 +133,7 @@
+             );
+         }
+ 
+-        GachaService.PrepareOutcome preparation = Emipokemon.gachaService().preparePull(player, bannerId);
++        GachaService.PrepareOutcome preparation = Emipokemon.gachaService().preparePull(player, bannerId, isEmiThemed() ? featuredSpeciesId : "");
+         if (!preparation.success()) {
+             setError();
+             return preparation;
+@@ -234,6 +241,7 @@
+         if (world.isClient) return;
+         if (world instanceof ServerWorld serverWorld) {
+             long staggered = world.getTime() + Math.floorMod(pos.asLong(), 100L);
++            machine.migrateLegacyDefaultBannerIfNeeded();
+             if (staggered % 100L == 0L) machine.refreshFeaturedPokemon();
+             machine.emitSeasonDisplayEffects(serverWorld, staggered);
+         }
+@@ -345,6 +353,7 @@
+     protected void writeNbt(NbtCompound nbt, RegistryWrapper.WrapperLookup registryLookup) {
+         super.writeNbt(nbt, registryLookup);
+         nbt.putString("BannerId", bannerId);
++        nbt.putBoolean("BannerExplicit", bannerExplicitlyConfigured);
+         nbt.putString("FeaturedSpecies", featuredSpeciesId);
+         nbt.putString("FeaturedName", featuredPokemonName);
+         nbt.putString("MachineState", machineState.name());
+@@ -358,6 +367,7 @@
+     protected void readNbt(NbtCompound nbt, RegistryWrapper.WrapperLookup registryLookup) {
+         super.readNbt(nbt, registryLookup);
+         if (nbt.contains("BannerId")) bannerId = nbt.getString("BannerId");
++        bannerExplicitlyConfigured = nbt.contains("BannerExplicit") && nbt.getBoolean("BannerExplicit");
+         featuredSpeciesId = nbt.contains("FeaturedSpecies") ? nbt.getString("FeaturedSpecies") : "";
+         featuredPokemonName = nbt.contains("FeaturedName") ? nbt.getString("FeaturedName") : "";
+         try {
+@@ -409,26 +419,46 @@
+         return cache;
+     }
+ 
++    private void migrateLegacyDefaultBannerIfNeeded() {
++        if (world == null || world.isClient || isEmiThemed() || bannerExplicitlyConfigured) return;
++        // Alpha.68 created every machine with the Rayquaza banner by default. Migrate only that implicit default.
++        if ("rayquaza_hoenn".equalsIgnoreCase(bannerId)) {
++            bannerId = "standard";
++            featuredSpeciesId = "";
++            featuredPokemonName = "";
++            markAndSync();
++        }
++    }
++
+     private void refreshFeaturedPokemon() {
+         if (world != null && world.isClient) return;
+         BannerDefinition banner = Emipokemon.bannerManager().get(bannerId);
++        PokemonCatalogEntry selected = null;
+         String nextSpecies = "";
+         String nextName = "";
+-        if (banner != null && banner.featuredSpecies != null && !banner.featuredSpecies.isEmpty()) {
+-            nextSpecies = banner.featuredSpecies.entrySet().stream()
+-                    .max(Comparator.comparingDouble(entry -> entry.getValue() == null ? 0.0D : entry.getValue()))
+-                    .map(Map.Entry::getKey).orElse("");
+-        }
+-        if (nextSpecies.startsWith("cobblemon:")) nextSpecies = nextSpecies.substring("cobblemon:".length());
+-        if (!nextSpecies.isBlank()) {
+-            PokemonCatalogEntry entry = Emipokemon.pokemonCatalog().get(nextSpecies);
+-            nextName = entry == null ? readableName(nextSpecies) : entry.displayName();
++
++        if (isEmiThemed()) {
++            selected = Emipokemon.featuredRotation().currentEmiLegendary();
++        } else {
++            // The normal machine stays random: its spotlight is visual only and does not boost roll weights.
++            selected = Emipokemon.featuredRotation().currentStandardSpotlight(banner);
++        }
++
++        if (selected != null) {
++            nextSpecies = selected.speciesId();
++            nextName = selected.displayName();
+         }
+         if (!nextSpecies.equals(featuredSpeciesId) || !nextName.equals(featuredPokemonName)) {
+             featuredSpeciesId = nextSpecies;
+             featuredPokemonName = nextName;
+             markAndSync();
+         }
++    }
++
++    private static String normalizeSpeciesId(String species) {
++        if (species == null) return "";
++        String normalized = species.strip().toLowerCase(Locale.ROOT);
++        return normalized.startsWith("cobblemon:") ? normalized.substring("cobblemon:".length()) : normalized;
+     }
+ 
+     private void emitSeasonDisplayEffects(ServerWorld serverWorld, long staggeredTime) {

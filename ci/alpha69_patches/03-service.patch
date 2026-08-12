@@ -1,0 +1,127 @@
+--- a/src/main/java/com/emipokemon/gacha/GachaService.java
++++ b/src/main/java/com/emipokemon/gacha/GachaService.java
+@@ -38,7 +38,7 @@
+     }
+ 
+     public PullOutcome pull(ServerPlayerEntity player, String bannerId) {
+-        return pullInternal(player, bannerId, null);
++        return pullInternal(player, bannerId, null, null);
+     }
+ 
+     public PullOutcome pullWithCurrencyOverride(
+@@ -46,15 +46,25 @@
+             String bannerId,
+             BannerDefinition.Currency currencyOverride
+     ) {
+-        return pullInternal(player, bannerId, currencyOverride);
++        return pullInternal(player, bannerId, currencyOverride, null);
++    }
++
++    public PullOutcome pullWithCurrencyOverride(
++            ServerPlayerEntity player,
++            String bannerId,
++            BannerDefinition.Currency currencyOverride,
++            String featuredSpeciesOverride
++    ) {
++        return pullInternal(player, bannerId, currencyOverride, featuredSpeciesOverride);
+     }
+ 
+     private PullOutcome pullInternal(
+             ServerPlayerEntity player,
+             String bannerId,
+-            BannerDefinition.Currency currencyOverride
+-    ) {
+-        PrepareOutcome preparation = preparePull(player, bannerId);
++            BannerDefinition.Currency currencyOverride,
++            String featuredSpeciesOverride
++    ) {
++        PrepareOutcome preparation = preparePull(player, bannerId, featuredSpeciesOverride);
+         if (!preparation.success()) return PullOutcome.failure(preparation.error());
+         return commitPreparedPull(player, preparation.preparedPull(), currencyOverride);
+     }
+@@ -64,6 +74,10 @@
+      * While the reservation exists, that player cannot start another gacha transaction.
+      */
+     public PrepareOutcome preparePull(ServerPlayerEntity player, String bannerId) {
++        return preparePull(player, bannerId, null);
++    }
++
++    public PrepareOutcome preparePull(ServerPlayerEntity player, String bannerId, String featuredSpeciesOverride) {
+         BannerDefinition banner = banners.get(bannerId);
+         if (banner == null || !banner.activeNow()) {
+             return PrepareOutcome.failure("Banner no encontrado o desactivado: " + bannerId);
+@@ -81,7 +95,7 @@
+ 
+             PlayerData data = playerData.getOrLoad(playerId);
+             GachaProgress progress = data.gacha(banner.id);
+-            GachaRollResult result = roll(banner, progress);
++            GachaRollResult result = roll(banner, progress, featuredSpeciesOverride);
+             if (result == null) {
+                 return PrepareOutcome.failure("El banner no tiene Pokemon validos para sus filtros/tiers.");
+             }
+@@ -160,7 +174,7 @@
+     public GachaRollResult simulate(String bannerId) {
+         BannerDefinition banner = banners.get(bannerId);
+         if (banner == null || !banner.activeNow() || catalog.size() == 0) return null;
+-        return roll(banner, new GachaProgress());
++        return roll(banner, new GachaProgress(), null);
+     }
+ 
+     public Map<GachaTier, Integer> poolCounts(String bannerId) {
+@@ -178,14 +192,19 @@
+         return List.copyOf(poolsFor(banner).getOrDefault(tier, List.of()));
+     }
+ 
+-    private GachaRollResult roll(BannerDefinition banner, GachaProgress progress) {
++    private GachaRollResult roll(BannerDefinition banner, GachaProgress progress, String featuredSpeciesOverride) {
+         Map<GachaTier, List<PokemonCatalogEntry>> pools = poolsFor(banner);
++        PokemonCatalogEntry featuredOverride = catalog.get(featuredSpeciesOverride);
++        if (featuredOverride != null && featuredOverride.tier() == GachaTier.LEGENDARY
++                && !pools.get(GachaTier.LEGENDARY).contains(featuredOverride)) {
++            pools.get(GachaTier.LEGENDARY).add(featuredOverride);
++        }
+         GachaTier tier = rollTier(banner, progress, pools);
+         if (tier == null) return null;
+ 
+         List<PokemonCatalogEntry> candidates = pools.getOrDefault(tier, List.of());
+         if (candidates.isEmpty()) return null;
+-        PokemonCatalogEntry selected = weightedSpecies(candidates, banner);
++        PokemonCatalogEntry selected = weightedSpecies(candidates, banner, featuredSpeciesOverride);
+         int minLevel = banner.minLevelFor(tier);
+         int maxLevel = banner.maxLevelFor(tier);
+         int level = ThreadLocalRandom.current().nextInt(minLevel, maxLevel + 1);
+@@ -252,12 +271,19 @@
+         return weights.keySet().iterator().next();
+     }
+ 
+-    private PokemonCatalogEntry weightedSpecies(List<PokemonCatalogEntry> candidates, BannerDefinition banner) {
++    private PokemonCatalogEntry weightedSpecies(List<PokemonCatalogEntry> candidates, BannerDefinition banner,
++                                                 String featuredSpeciesOverride) {
+         Map<PokemonCatalogEntry, Double> weights = new HashMap<>();
+         double total = 0;
++        boolean machineOverride = featuredSpeciesOverride != null;
++        String featured = normalizeSpeciesId(featuredSpeciesOverride);
+         for (PokemonCatalogEntry entry : candidates) {
+             double naturalWeight = 0.25 + Math.min(2.75, Math.max(0, entry.catchRate()) / 60.0);
+-            double weight = naturalWeight * banner.featuredMultiplier(entry.speciesId());
++            double featuredMultiplier = !machineOverride
++                    ? banner.featuredMultiplier(entry.speciesId())
++                    : (!featured.isBlank() && normalizeSpeciesId(entry.speciesId()).equals(featured)
++                    ? com.emipokemon.gacha.banner.FeaturedRotationService.EMI_FEATURED_MULTIPLIER : 1.0D);
++            double weight = naturalWeight * featuredMultiplier;
+             weights.put(entry, weight);
+             total += weight;
+         }
+@@ -271,6 +297,12 @@
+         return candidates.get(candidates.size() - 1);
+     }
+ 
++    private static String normalizeSpeciesId(String speciesId) {
++        if (speciesId == null) return "";
++        String value = speciesId.strip().toLowerCase(java.util.Locale.ROOT);
++        return value.startsWith("cobblemon:") ? value.substring("cobblemon:".length()) : value;
++    }
++
+     public record PreparedPull(
+             UUID transactionId,
+             UUID playerUuid,

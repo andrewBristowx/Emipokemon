@@ -1,0 +1,119 @@
+--- a/src/test/java/com/emipokemon/casino/CasinoAlpha61EffectsRegressionTest.java
++++ b/src/test/java/com/emipokemon/casino/CasinoAlpha61EffectsRegressionTest.java
+@@ -46,7 +46,7 @@
+ 
+     @Test
+     void alpha61VersionIsConsistent() throws Exception {
+-        assertTrue(Files.readString(Path.of("gradle.properties")).contains("mod_version=0.4.0-alpha.68"));
+-        assertTrue(Files.readString(Path.of("src/main/java/com/emipokemon/Emipokemon.java")).contains("0.4.0-alpha.68"));
++        assertTrue(Files.readString(Path.of("gradle.properties")).contains("mod_version=0.4.0-alpha.69"));
++        assertTrue(Files.readString(Path.of("src/main/java/com/emipokemon/Emipokemon.java")).contains("0.4.0-alpha.69"));
+     }
+ }
+--- a/src/test/java/com/emipokemon/casino/CasinoAlpha62ClawAndWagerRegressionTest.java
++++ b/src/test/java/com/emipokemon/casino/CasinoAlpha62ClawAndWagerRegressionTest.java
+@@ -40,7 +40,7 @@
+     }
+ 
+     @Test void alpha62VersionIsConsistent() throws Exception {
+-        assertTrue(Files.readString(Path.of("gradle.properties")).contains("mod_version=0.4.0-alpha.68"));
+-        assertTrue(source("main/java/com/emipokemon/Emipokemon.java").contains("0.4.0-alpha.68"));
++        assertTrue(Files.readString(Path.of("gradle.properties")).contains("mod_version=0.4.0-alpha.69"));
++        assertTrue(source("main/java/com/emipokemon/Emipokemon.java").contains("0.4.0-alpha.69"));
+     }
+ }
+--- a/src/test/java/com/emipokemon/casino/CasinoAlpha63PokemonSelectionRegressionTest.java
++++ b/src/test/java/com/emipokemon/casino/CasinoAlpha63PokemonSelectionRegressionTest.java
+@@ -35,7 +35,7 @@
+     }
+ 
+     @Test void alpha63IdentityIsConsistent() throws Exception {
+-        assertTrue(Files.readString(Path.of("gradle.properties")).contains("mod_version=0.4.0-alpha.68"));
+-        assertTrue(source("main/java/com/emipokemon/Emipokemon.java").contains("0.4.0-alpha.68"));
++        assertTrue(Files.readString(Path.of("gradle.properties")).contains("mod_version=0.4.0-alpha.69"));
++        assertTrue(source("main/java/com/emipokemon/Emipokemon.java").contains("0.4.0-alpha.69"));
+     }
+ }
+--- a/src/test/java/com/emipokemon/casino/CasinoConnectedPiecesRegressionTest.java
++++ b/src/test/java/com/emipokemon/casino/CasinoConnectedPiecesRegressionTest.java
+@@ -79,7 +79,7 @@
+ 
+     @Test
+     void alpha60VersionIsConsistent() throws Exception {
+-        assertTrue(Files.readString(Path.of("gradle.properties")).contains("mod_version=0.4.0-alpha.68"));
+-        assertTrue(Files.readString(Path.of("src/main/java/com/emipokemon/Emipokemon.java")).contains("0.4.0-alpha.68"));
++        assertTrue(Files.readString(Path.of("gradle.properties")).contains("mod_version=0.4.0-alpha.69"));
++        assertTrue(Files.readString(Path.of("src/main/java/com/emipokemon/Emipokemon.java")).contains("0.4.0-alpha.69"));
+     }
+ }
+--- a/src/test/java/com/emipokemon/casino/CasinoConstructionDetailRegressionTest.java
++++ b/src/test/java/com/emipokemon/casino/CasinoConstructionDetailRegressionTest.java
+@@ -73,7 +73,7 @@
+ 
+     @Test
+     void alpha60VersionIsConsistent() throws Exception {
+-        assertTrue(Files.readString(Path.of("gradle.properties")).contains("mod_version=0.4.0-alpha.68"));
+-        assertTrue(Files.readString(Path.of("src/main/java/com/emipokemon/Emipokemon.java")).contains("0.4.0-alpha.68"));
++        assertTrue(Files.readString(Path.of("gradle.properties")).contains("mod_version=0.4.0-alpha.69"));
++        assertTrue(Files.readString(Path.of("src/main/java/com/emipokemon/Emipokemon.java")).contains("0.4.0-alpha.69"));
+     }
+ }
+--- a/src/test/java/com/emipokemon/casino/CasinoMaterialScaleRegressionTest.java
++++ b/src/test/java/com/emipokemon/casino/CasinoMaterialScaleRegressionTest.java
+@@ -68,7 +68,7 @@
+ 
+     @Test
+     void alpha60VersionIsConsistent() throws Exception {
+-        assertTrue(Files.readString(Path.of("gradle.properties")).contains("mod_version=0.4.0-alpha.68"));
+-        assertTrue(Files.readString(Path.of("src/main/java/com/emipokemon/Emipokemon.java")).contains("0.4.0-alpha.68"));
++        assertTrue(Files.readString(Path.of("gradle.properties")).contains("mod_version=0.4.0-alpha.69"));
++        assertTrue(Files.readString(Path.of("src/main/java/com/emipokemon/Emipokemon.java")).contains("0.4.0-alpha.69"));
+     }
+ }
+--- a/src/test/java/com/emipokemon/casino/CasinoMultiplayerRegressionTest.java
++++ b/src/test/java/com/emipokemon/casino/CasinoMultiplayerRegressionTest.java
+@@ -87,7 +87,7 @@
+ 
+     @Test
+     void alpha60VersionIsConsistent() throws Exception {
+-        assertTrue(Files.readString(Path.of("gradle.properties")).contains("mod_version=0.4.0-alpha.68"));
+-        assertTrue(source("main/java/com/emipokemon/Emipokemon.java").contains("0.4.0-alpha.68"));
++        assertTrue(Files.readString(Path.of("gradle.properties")).contains("mod_version=0.4.0-alpha.69"));
++        assertTrue(source("main/java/com/emipokemon/Emipokemon.java").contains("0.4.0-alpha.69"));
+     }
+ }
+--- a/src/test/java/com/emipokemon/casino/CasinoRouletteGuiRegressionTest.java
++++ b/src/test/java/com/emipokemon/casino/CasinoRouletteGuiRegressionTest.java
+@@ -73,7 +73,7 @@
+ 
+     @Test
+     void alpha60VersionIsConsistent() throws Exception {
+-        assertTrue(Files.readString(Path.of("gradle.properties")).contains("mod_version=0.4.0-alpha.68"));
+-        assertTrue(Files.readString(Path.of("src/main/java/com/emipokemon/Emipokemon.java")).contains("0.4.0-alpha.68"));
++        assertTrue(Files.readString(Path.of("gradle.properties")).contains("mod_version=0.4.0-alpha.69"));
++        assertTrue(Files.readString(Path.of("src/main/java/com/emipokemon/Emipokemon.java")).contains("0.4.0-alpha.69"));
+     }
+ }
+--- a/src/test/java/com/emipokemon/casino/CasinoSilhouetteRegressionTest.java
++++ b/src/test/java/com/emipokemon/casino/CasinoSilhouetteRegressionTest.java
+@@ -81,7 +81,7 @@
+ 
+     @Test
+     void alpha60VersionIsConsistent() throws Exception {
+-        assertTrue(Files.readString(Path.of("gradle.properties")).contains("mod_version=0.4.0-alpha.68"));
+-        assertTrue(Files.readString(Path.of("src/main/java/com/emipokemon/Emipokemon.java")).contains("0.4.0-alpha.68"));
++        assertTrue(Files.readString(Path.of("gradle.properties")).contains("mod_version=0.4.0-alpha.69"));
++        assertTrue(Files.readString(Path.of("src/main/java/com/emipokemon/Emipokemon.java")).contains("0.4.0-alpha.69"));
+     }
+ }
+--- a/src/test/java/com/emipokemon/visual/VisualRefreshRegressionTest.java
++++ b/src/test/java/com/emipokemon/visual/VisualRefreshRegressionTest.java
+@@ -70,7 +70,7 @@
+     @Test
+     void alpha60VersionIsConsistentInSource() throws Exception {
+         String core = source("main/java/com/emipokemon/Emipokemon.java");
+-        assertTrue(core.contains("0.4.0-alpha.68"));
++        assertTrue(core.contains("0.4.0-alpha.69"));
+         assertFalse(core.contains("0.4.0-alpha.22"));
+     }
+ 
