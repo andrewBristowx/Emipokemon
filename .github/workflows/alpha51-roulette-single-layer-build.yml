@@ -1,0 +1,85 @@
+name: alpha51-roulette-single-layer-build
+
+on:
+  push:
+    branches: [release/0.4.0-alpha.51]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout alpha.51 transforms
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Python image checks
+        run: python3 -m pip install --disable-pip-version-check pillow
+
+      - name: Download exact alpha.48 source baseline
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 3 --retry-delay 2 \
+            'https://drive.usercontent.google.com/download?id=1pfp3rREGl5IBAAnV5tKLCMdupi34Mce2&export=download&confirm=t' \
+            -o alpha48-source.zip
+          echo 'bd5ce85b5534c632ee8761c9c7a494fb2806046bd29d5d70ffe876cc10dc6119  alpha48-source.zip' | sha256sum -c -
+          mkdir work
+          unzip -q alpha48-source.zip -d work
+
+      - name: Reproduce alpha.49 and alpha.50
+        shell: bash
+        working-directory: work
+        run: |
+          set -euxo pipefail
+          git apply -p0 "$GITHUB_WORKSPACE/ci/alpha49_visual_and_server.patch"
+          python3 "$GITHUB_WORKSPACE/ci/alpha49_core.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha49_tests.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha50_core.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha50_tests.py"
+
+      - name: Apply alpha.51 single-layer renderer
+        shell: bash
+        working-directory: work
+        run: |
+          set -euxo pipefail
+          python3 "$GITHUB_WORKSPACE/ci/alpha51_core.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha51_tests.py"
+
+      - name: Test and build with Java 21
+        shell: bash
+        working-directory: work
+        run: |
+          sed -i 's/\r$//' gradlew
+          chmod +x gradlew
+          ./gradlew clean test build --no-daemon --stacktrace
+
+      - name: Verify release and checksums
+        shell: bash
+        run: |
+          set -euxo pipefail
+          test -f work/build/libs/emipokemon-0.4.0-alpha.51.jar
+          unzip -p work/build/libs/emipokemon-0.4.0-alpha.51.jar fabric.mod.json | grep -q '0.4.0-alpha.51'
+          unzip -l work/build/libs/emipokemon-0.4.0-alpha.51.jar | grep -q 'roulette_alpha51_background.png'
+          unzip -l work/build/libs/emipokemon-0.4.0-alpha.51.jar | grep -q 'roulette_alpha51_wheel.png'
+          unzip -l work/build/libs/emipokemon-0.4.0-alpha.51.jar | grep -q 'font/casino.json'
+          sha256sum work/build/libs/emipokemon-0.4.0-alpha.51.jar | tee SHA256SUMS-0.4.0-alpha.51.txt
+
+      - name: Upload alpha.51 build
+        uses: actions/upload-artifact@v4
+        with:
+          name: Emipokemon-0.4.0-alpha.51-github-build
+          path: |
+            work/build/libs/emipokemon-0.4.0-alpha.51.jar
+            SHA256SUMS-0.4.0-alpha.51.txt
+          if-no-files-found: error

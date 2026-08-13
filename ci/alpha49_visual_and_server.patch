@@ -1,0 +1,207 @@
+--- src/client/java/com/emipokemon/client/casino/CasinoScreen.java
++++ src/client/java/com/emipokemon/client/casino/CasinoScreen.java
+@@ -77,6 +77,7 @@ final class CasinoScreen extends Screen {
+     private int sideW;
+     private int contentTop;
+     private int rouletteHeaderH;
++    private int rouletteOverlapH;
+     private int rouletteBoardY;
+     private int rouletteCellW;
+     private int rouletteCellH;
+@@ -117,17 +118,16 @@ final class CasinoScreen extends Screen {
+     }
+
+     private void initRoulette() {
+-        int gap = 8;
+-        rouletteContentH = Math.max(334, panelH - rouletteHeaderH - 6);
+-        int idealGameW = Math.round(rouletteContentH * (ROULETTE_LEFT_W / (float)ROULETTE_LEFT_H));
+-        int idealSideW = Math.round(rouletteContentH * (ROULETTE_SIDE_W / (float)ROULETTE_SIDE_H));
+-        int availableW = panelW - 24;
+-        float fit = Math.min(1.0F, availableW / (float)(idealGameW + gap + idealSideW));
+-        gameW = Math.round(idealGameW * fit);
+-        sideW = Math.round(idealSideW * fit);
+-        rouletteContentH = Math.round(rouletteContentH * fit);
+-        gameX = panelX + (panelW - gameW - gap - sideW) / 2;
+-        sideX = gameX + gameW + gap;
++        // The HD source is one composition split into a header and two content textures.
++        // Fill the panel width so wide GUI scales never create artificial black side gutters.
++        int availableContentH = panelH - rouletteHeaderH;
++        rouletteOverlapH = Math.max(5, Math.round(availableContentH * 28.0F / ROULETTE_LEFT_TEX_H));
++        contentTop -= rouletteOverlapH;
++        rouletteContentH = panelY + panelH - contentTop;
++        gameX = panelX;
++        gameW = Math.round(panelW * (ROULETTE_LEFT_TEX_W / (float)(ROULETTE_LEFT_TEX_W + ROULETTE_SIDE_TEX_W)));
++        sideX = gameX + gameW;
++        sideW = panelX + panelW - sideX;
+
+         int fieldX = sideX + sidePx(62);
+         int fieldY = contentTop + sidePy(146);
+@@ -251,14 +251,17 @@ final class CasinoScreen extends Screen {
+         context.fill(panelX - 4, panelY + 5, panelX + panelW + 4, panelY + panelH + 5, 0x99000000);
+
+         if (isRoulette()) {
+-            drawAsset(context, ROULETTE_HEADER, panelX, panelY, panelW, rouletteHeaderH, ROULETTE_HEADER_TEX_W, ROULETTE_HEADER_TEX_H);
+             drawAsset(context, ROULETTE_LEFT_PANEL, gameX, contentTop, gameW, rouletteContentH, ROULETTE_LEFT_TEX_W, ROULETTE_LEFT_TEX_H);
+             drawAsset(context, ROULETTE_SIDE_PANEL, sideX, contentTop, sideW, rouletteContentH, ROULETTE_SIDE_TEX_W, ROULETTE_SIDE_TEX_H);
+-            renderRouletteEdgeCleanup(context);
++            // The source header overlaps both panels. Drawing it last hides the clipped seam
++            // fragments that were visible immediately below the alpha.48 header.
++            drawAsset(context, ROULETTE_HEADER, panelX, panelY, panelW, rouletteHeaderH, ROULETTE_HEADER_TEX_W, ROULETTE_HEADER_TEX_H);
+
+-            // Let the real TextFieldWidget receive focus/keyboard input first. Roulette chrome and
+-            // dynamic values are then painted over it so values look like part of the casino art.
++            // Keep the real field active for input, but render its value once through our slot.
++            boolean fieldWasVisible = amountField != null && amountField.visible;
++            if (amountField != null) amountField.visible = false;
+             super.render(context, mouseX, mouseY, delta);
++            if (amountField != null) amountField.visible = fieldWasVisible;
+             renderRoulette(context, mouseX, mouseY);
+             return;
+         }
+@@ -277,23 +280,6 @@ final class CasinoScreen extends Screen {
+         super.render(context, mouseX, mouseY, delta);
+     }
+
+-    private void renderRouletteEdgeCleanup(DrawContext context) {
+-        // The approved source art contains a few decorative chips/coins that were already cut
+-        // by the original image boundary. Replace only those terminal pixels with a complete
+-        // in-game frame so no partial ornament appears clipped at the bottom of the GUI.
+-        int leftTrim = Math.max(5, leftPy(14));
+-        int leftBottom = contentTop + rouletteContentH;
+-        context.fill(gameX + 2, leftBottom - leftTrim, gameX + gameW - 2, leftBottom - 2, 0xFF07503A);
+-        context.fill(gameX + 2, leftBottom - 3, gameX + gameW - 2, leftBottom - 1, 0xFFD69A30);
+-        outline(context, gameX, contentTop, gameW, rouletteContentH, 0xFFB87825);
+-
+-        int sideTrim = Math.max(7, sidePy(21));
+-        int sideBottom = contentTop + rouletteContentH;
+-        context.fill(sideX + 2, sideBottom - sideTrim, sideX + sideW - 2, sideBottom - 2, 0xFF130A18);
+-        context.fill(sideX + 2, sideBottom - 3, sideX + sideW - 2, sideBottom - 1, 0xFFD69A30);
+-        outline(context, sideX, contentTop, sideW, rouletteContentH, 0xFFB87825);
+-    }
+-
+     private void renderRoulette(DrawContext context, int mouseX, int mouseY) {
+         renderHeaderBalance(context);
+         drawRouletteWheel(context);
+@@ -328,21 +314,24 @@ final class CasinoScreen extends Screen {
+         int w = Math.max(76, headerPx(172));
+         int y = panelY + headerPy(72);
+         String value = state.balance() + " Michicoins";
+-        drawCenteredUiText(context, value, x + w / 2, y, 0xFFFFDF62, true);
++        drawFittedCenteredUiText(context, value, x + w / 2, y, w - headerPx(12), 0xFFFFDF62, false);
+     }
+
+     private void renderRoundState(DrawContext context) {
+         int x = sideX + sidePx(29);
+         int y = contentTop + sidePy(48);
+-        int w = sidePx(238);
+-        // Keep this within the empty section body rather than floating over the section title.
+-        context.fill(x, y, x + w, y + sidePy(25), 0xE80C0A15);
+-        outline(context, x, y, w, sidePy(25), 0xFF72552D);
+-        drawUiText(context, phaseLabel(), x + sidePx(9), y + sidePy(7), isBettingPhase() ? 0xFF8CF0AF : 0xFFFFDB68, true);
++        int badgeW = sidePx(98);
++        int badgeH = sidePy(25);
++        int badgeColor = isBettingPhase() ? 0xE814542F : 0xE85A3B12;
++        context.fill(x, y, x + badgeW, y + badgeH, badgeColor);
++        outline(context, x, y, badgeW, badgeH, isBettingPhase() ? 0xFF29B963 : 0xFFE2A43A);
++        drawCenteredUiText(context, phaseLabel(), x + badgeW / 2, y + sidePy(7),
++                isBettingPhase() ? 0xFF9AF2B6 : 0xFFFFDB68, false);
+         String timer = timerOnly();
+         if (!timer.isBlank()) {
+-            int tx = x + w - sidePx(10) - textRenderer.getWidth(timer);
+-            drawUiText(context, timer, tx, y + sidePy(7), 0xFFFFE9A1, true);
++            int timerCenter = sideX + sidePx(218);
++            drawCenteredUiText(context, "Inicia en:", timerCenter, y, 0xFFF7F0E4, false);
++            drawCenteredUiText(context, timer, timerCenter, y + sidePy(14), 0xFFFFE9A1, false);
+         }
+     }
+
+@@ -356,8 +345,10 @@ final class CasinoScreen extends Screen {
+         context.fill(x + 2, y + 2, x + w - 2, y + h - 2, 0xFF07101F);
+         String value = amountField == null ? startAmount() : amountField.getText();
+         int textY = y + Math.max(4, (h - 8) / 2);
+-        int textX = x + sidePx(10);
+-        drawUiText(context, value, textX, textY, 0xFFF7F0E4, true);
++        int coinX = x + sidePx(12);
++        drawCoin(context, coinX, y + h / 2, Math.max(3, sidePx(5)));
++        int textX = x + sidePx(23);
++        drawUiText(context, value, textX, textY, 0xFFF7F0E4, false);
+
+         if (amountField != null && amountField.isFocused() && ((System.currentTimeMillis() / 450L) & 1L) == 0L) {
+             int caretX = Math.min(x + w - sidePx(8), textX + textRenderer.getWidth(value) + 1);
+@@ -368,13 +359,14 @@ final class CasinoScreen extends Screen {
+     private void renderPlayerCount(DrawContext context, int count) {
+         // alpha.47's visual source had a baked-in "0/8". Cover only that text and replace it
+         // with the live participant count; the blue players icon remains untouched.
+-        int x = sideX + sidePx(236);
+-        int y = contentTop + sidePy(326);
+-        int w = sidePx(48);
+-        int h = sidePy(27);
+-        context.fill(x, y, x + w, y + h, 0xFF61052E);
++        int x = sideX + sidePx(240);
++        int y = contentTop + sidePy(333);
++        int w = sidePx(40);
++        int h = sidePy(17);
++        // Mask only the baked glyphs, not the blue player icon or the gold section frame.
++        context.fill(x, y, x + w, y + h, 0xFF53082D);
+         String value = count + "/" + ROULETTE_DISPLAY_CAPACITY;
+-        drawCenteredUiText(context, value, x + w / 2, y + sidePy(7), 0xFFFFD85B, true);
++        drawCenteredUiText(context, value, x + w / 2, y + sidePy(3), 0xFFFFD85B, false);
+     }
+
+     private void drawUiText(DrawContext context, String value, int x, int y, int color, boolean bold) {
+@@ -387,6 +379,18 @@ final class CasinoScreen extends Screen {
+         context.drawTextWithShadow(textRenderer, text, centerX - textRenderer.getWidth(text) / 2, y, color);
+     }
+
++    private void drawFittedCenteredUiText(DrawContext context, String value, int centerX, int y,
++                                          int maxWidth, int color, boolean bold) {
++        Text text = bold ? Text.literal(value).formatted(Formatting.BOLD) : Text.literal(value);
++        int textWidth = Math.max(1, textRenderer.getWidth(text));
++        float scale = Math.min(1.0F, maxWidth / (float)textWidth);
++        context.getMatrices().push();
++        context.getMatrices().translate(centerX, y, 0.0F);
++        context.getMatrices().scale(scale, scale, 1.0F);
++        context.drawTextWithShadow(textRenderer, text, -textWidth / 2, 0, color);
++        context.getMatrices().pop();
++    }
++
+     private int drawIntegratedWrapped(DrawContext context, String value, int x, int y, int width, int color, int maxY) {
+         if (value == null || value.isBlank()) return y;
+         for (var line : textRenderer.wrapLines(Text.literal(value), width)) {
+@@ -505,11 +509,10 @@ final class CasinoScreen extends Screen {
+         int w = leftPx(145);
+         int h = leftPy(69);
+
+-        // Dedicated data well: the generated panel remains the frame, while this clean inner well
+-        // prevents roulette results from sitting on top of ornamental/source text.
+-        context.fill(x, y, x + w, y + h, 0xE80D432F);
+-        outline(context, x, y, w, h, 0xFFB98A35);
+-        drawCenteredUiText(context, "ÚLTIMOS", x + w / 2, y + leftPy(8), 0xFFFFD76A, true);
++        // Clean only the intended data well. Its original gold frame and nearby decoration stay
++        // untouched, so history reads as part of the source art rather than a panel above it.
++        context.fill(x + 2, y + 2, x + w - 2, y + h - 2, 0xFF064633);
++        drawCenteredUiText(context, "Últimos resultados", x + w / 2, y + leftPy(8), 0xFFFFD76A, false);
+
+         int count = Math.min(5, recent.size());
+         if (count == 0) {
+--- src/main/java/com/emipokemon/casino/CasinoTableService.java
++++ src/main/java/com/emipokemon/casino/CasinoTableService.java
+@@ -38,6 +38,7 @@ final class CasinoTableService {
+     private static final long RESULT_MS = 5_000L;
+     private static final int MAX_BLACKJACK_PLAYERS = 5;
+     private static final int MAX_POKER_PLAYERS = 6;
++    private static final int MAX_ROULETTE_PLAYERS = 8;
+
+     private final Map<TableKey, Session> sessions = new HashMap<>();
+     private final Map<UUID, Long> lastAction = new HashMap<>();
+@@ -120,6 +121,10 @@ final class CasinoTableService {
+             CasinoNetworking.sendTable(player, machine, stateFor(player, session, "Ya tienes una apuesta registrada en esta ronda."));
+             return;
+         }
++        if (roulette && session.participants.size() >= MAX_ROULETTE_PLAYERS) {
++            CasinoNetworking.sendTable(player, machine, stateFor(player, session, "La mesa de ruleta está completa (8/8)."));
++            return;
++        }
+         String game = roulette ? "roulette" : "dice";
+         if (!reserve(player, amount, game + ":round:" + session.roundId)) {
+             CasinoNetworking.sendTable(player, machine, stateFor(player, session, betError(amount)));

@@ -54,3 +54,8 @@
 - No sobrescribir versiones estables sin validar la siguiente.
 - GeckoLib se usa para presentación visual, no para decidir lógica de juego.
 - No duplicar funciones cubiertas por mods administrativos externos.
+# Estado tras 0.4.0-alpha.62
+
+- Fase 9: completada — casino visual, sonidos, animaciones y juegos anteriores.
+- Fase 10: candidata a validación real — máquina de garra con ticket propio, auditoría de pagos y cara o sello Pokémon con depósito persistente.
+- Pausa de validación: falta probar la transferencia Pokémon con dos cuentas reales y reinicio controlado antes de marcar la fase 10 como estable.

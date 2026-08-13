@@ -1,0 +1,23 @@
+{
+  "key.emipokemon.quests": "Open quest journal",
+  "key.emipokemon.battle_pass": "Open Emi infinite pass",
+  "category.emipokemon": "Emipokemon",
+  "item.emipokemon.gacha_ticket": "Gacha Ticket",
+  "item.emipokemon.emi_special_banner_ticket": "Emi Special Banner Ticket",
+  "item.emipokemon.casino_chip": "Casino Chip",
+  "item.emipokemon.claw_ticket": "Claw Ticket",
+  "block.emipokemon.standard_gacha_machine": "Emipokemon Gacha Machine",
+  "block.emipokemon.emi_gacha_machine": "Emi Gacha Machine",
+  "block.emipokemon.gacha_machine_top": "Gacha Machine Upper Part",
+  "block.emipokemon.slot_machine": "Slot Machine",
+  "block.emipokemon.michicoin_chip_machine": "Michicoin Chip Machine",
+  "block.emipokemon.ticket_machine": "Ticket Machine",
+  "block.emipokemon.casino_roulette": "Casino Roulette",
+  "block.emipokemon.poker_table": "Poker Table",
+  "block.emipokemon.blackjack_table": "Blackjack Table",
+  "block.emipokemon.dice_table": "Dice Table",
+  "block.emipokemon.claw_machine": "Pokédoll Claw Machine",
+  "block.emipokemon.pokemon_wager_table": "Pokémon Coin Flip Table",
+  "entity.emipokemon.nurse_npc": "Nurse Emi",
+  "entity.emipokemon.shop_npc": "Poké Mart Clerk"
+}
