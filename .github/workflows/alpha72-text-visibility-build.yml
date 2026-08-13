@@ -1,0 +1,90 @@
+name: alpha72-text-visibility-build
+
+on:
+  push:
+    branches: [release/0.4.0-alpha.72]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Download exact validated alpha.71 source artifact
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 3 --retry-delay 2 \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            'https://api.github.com/repos/andrewBristowx/Emipokemon/actions/artifacts/9165523193/zip' \
+            -o alpha71-artifact.zip
+          mkdir alpha71-artifact work
+          unzip -q alpha71-artifact.zip -d alpha71-artifact
+          source_zip="$(find alpha71-artifact -type f -name 'Emipokemon-0.4.0-alpha.71-source.zip' -print -quit)"
+          test -n "$source_zip"
+          unzip_rc=0
+          unzip -q "$source_zip" -d work || unzip_rc=$?
+          test "$unzip_rc" -le 1
+          chmod -R u+rwX work
+          grep -q 'mod_version=0.4.0-alpha.71' work/gradle.properties
+
+      - name: Apply alpha.72 text visibility overlay
+        working-directory: work
+        run: |
+          set -euxo pipefail
+          python3 "$GITHUB_WORKSPACE/ci/alpha72_text.py"
+          grep -q 'mod_version=0.4.0-alpha.72' gradle.properties
+          grep -q 'SeasonalPokemonWorldRenderer.drawText' src/client/java/com/emipokemon/client/render/GachaMachineRenderer.java
+          grep -q '3.72D' src/client/java/com/emipokemon/client/render/SeasonalPokemonWorldRenderer.java
+          grep -q '3.43D' src/client/java/com/emipokemon/client/render/SeasonalPokemonWorldRenderer.java
+          grep -q 'SEE_THROUGH' src/client/java/com/emipokemon/client/render/SeasonalPokemonWorldRenderer.java
+
+      - name: Test and build with Java 21
+        working-directory: work
+        run: |
+          set -euxo pipefail
+          sed -i 's/\r$//' gradlew
+          chmod +x gradlew
+          for attempt in 1 2 3; do
+            if ./gradlew --version --no-daemon; then break; fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            sleep $((attempt * 5))
+          done
+          ./gradlew clean test build --no-daemon --stacktrace
+
+      - name: Verify and package candidate
+        shell: bash
+        run: |
+          set -euxo pipefail
+          jar='work/build/libs/emipokemon-0.4.0-alpha.72.jar'
+          test -f "$jar"
+          unzip -p "$jar" fabric.mod.json | grep -q '0.4.0-alpha.72'
+          unzip -l "$jar" | grep -q 'com/emipokemon/client/render/SeasonalPokemonWorldRenderer.class'
+          unzip -l "$jar" | grep -q 'com/emipokemon/client/render/GachaMachineRenderer.class'
+          cd work
+          zip -qr ../Emipokemon-0.4.0-alpha.72-source.zip . -x 'build/*' '.gradle/*'
+          cd ..
+          sha256sum "$jar" Emipokemon-0.4.0-alpha.72-source.zip > SHA256SUMS-0.4.0-alpha.72.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Emipokemon-0.4.0-alpha.72-github-build
+          path: |
+            work/build/libs/emipokemon-0.4.0-alpha.72.jar
+            Emipokemon-0.4.0-alpha.72-source.zip
+            SHA256SUMS-0.4.0-alpha.72.txt
+            work/CHANGELOG-0.4.0-alpha.72.md
+            work/GUIA-PRUEBAS-0.4.0-alpha.72.md
+          if-no-files-found: error
