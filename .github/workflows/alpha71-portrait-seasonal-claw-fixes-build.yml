@@ -41,6 +41,7 @@ jobs:
         working-directory: work
         run: |
           python3 "$GITHUB_WORKSPACE/ci/alpha71_core.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha71_followup.py"
           python3 "$GITHUB_WORKSPACE/ci/alpha71_tests.py"
       - name: Test and build common, server and client with Java 21
         working-directory: work
