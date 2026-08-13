@@ -42,9 +42,9 @@ jobs:
         run: |
           set -euxo pipefail
           curl -fL --retry 3 --retry-delay 2 \
-            'https://drive.usercontent.google.com/download?id=1UtfxKwlpsJwI8RdfooX62kCR5t60yXmy&export=download&confirm=t' \
+            'https://drive.usercontent.google.com/download?id=10f1P0WI2sL94_eOtBOTZNFRuGDz3Wqvh&export=download&confirm=t' \
             -o alpha76_overlay.zip
-          echo '0460f1f70d078fa861a6db7e7f5158666a6854e83169eefbfad94571d3977769  alpha76_overlay.zip' | sha256sum -c -
+          echo '71829cd9b9be9980ccac76cc6d900f0c50e7247e5a3e2251718cc7fbd4eb1b95  alpha76_overlay.zip' | sha256sum -c -
           unzip -qo alpha76_overlay.zip -d work
           grep -q 'mod_version=0.4.0-alpha.76' work/gradle.properties
 
@@ -59,6 +59,7 @@ jobs:
           grep -q 'getMethod("getPOKEMON")' src/client/java/com/emipokemon/client/render/SeasonalPokemonWorldRenderer.java
           grep -q 'registerEmiToolRenderer(ModRegistries.EMI_SWORD' src/client/java/com/emipokemon/client/EmipokemonClient.java
           grep -q 'registerEmiToolRenderer(ModRegistries.EMI_HOE' src/client/java/com/emipokemon/client/EmipokemonClient.java
+          grep -q 'MAX_TREE_LOGS = 192' src/main/java/com/emipokemon/tools/EmiToolActions.java
           for n in sword pickaxe axe shovel hoe; do
             grep -q '"parent": "builtin/entity"' "src/main/resources/assets/emipokemon/models/item/emi_${n}.json"
             test -f "src/main/resources/assets/emipokemon/geo/item/emi_${n}.geo.json"
