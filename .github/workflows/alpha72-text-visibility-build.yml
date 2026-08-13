@@ -45,6 +45,7 @@ jobs:
         run: |
           set -euxo pipefail
           python3 "$GITHUB_WORKSPACE/ci/alpha72_text.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha72_followup.py"
           grep -q 'mod_version=0.4.0-alpha.72' gradle.properties
           grep -q 'SeasonalPokemonWorldRenderer.drawText' src/client/java/com/emipokemon/client/render/GachaMachineRenderer.java
           grep -q '3.72D' src/client/java/com/emipokemon/client/render/SeasonalPokemonWorldRenderer.java
