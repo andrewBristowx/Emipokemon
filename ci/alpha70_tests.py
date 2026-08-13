@@ -14,10 +14,13 @@ screen = text("src/client/java/com/emipokemon/client/gacha/GachaScreen.java")
 world = text("src/client/java/com/emipokemon/client/render/SeasonalPokemonWorldRenderer.java")
 banner = text("src/main/java/com/emipokemon/gacha/banner/BannerDefinition.java")
 block_entity = text("src/main/java/com/emipokemon/gacha/machine/GachaMachineBlockEntity.java")
+identity = text("src/main/java/com/emipokemon/Emipokemon.java")
 claw_path = root / "src/main/resources/assets/emipokemon/geo/casino_claw.geo.json"
 claw = json.loads(claw_path.read_text(encoding="utf-8"))
 
 assert "mod_version=0.4.0-alpha.70" in text("gradle.properties")
+assert 'public static final String VERSION = "0.4.0-alpha.70";' in identity
+assert "0.4.0-alpha.69" not in identity
 
 # Keep the safe clipping introduced in alpha69, but restore readable portraits.
 assert "enableScissor" in screen
