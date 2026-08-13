@@ -1,0 +1,126 @@
+name: alpha76-gecko-tools-build
+
+on:
+  push:
+    branches: [release/0.4.0-alpha.76]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Download exact successful alpha.75 source artifact
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 3 --retry-delay 2 \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            'https://api.github.com/repos/andrewBristowx/Emipokemon/actions/artifacts/9169692530/zip' \
+            -o alpha75-artifact.zip
+          mkdir alpha75-artifact work
+          unzip -q alpha75-artifact.zip -d alpha75-artifact
+          echo 'bcaaca671f00db914d7813ff0b18878d8339a3f2280796187bfe855de41d975f  alpha75-artifact/Emipokemon-0.4.0-alpha.75-source.zip' | sha256sum -c -
+          unzip -q alpha75-artifact/Emipokemon-0.4.0-alpha.75-source.zip -d work
+          chmod -R u+rwX work
+          grep -q 'mod_version=0.4.0-alpha.75' work/gradle.properties
+
+      - name: Download and apply verified alpha.76 overlay
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 3 --retry-delay 2 \
+            'https://drive.usercontent.google.com/download?id=1UtfxKwlpsJwI8RdfooX62kCR5t60yXmy&export=download&confirm=t' \
+            -o alpha76_overlay.zip
+          echo '0460f1f70d078fa861a6db7e7f5158666a6854e83169eefbfad94571d3977769  alpha76_overlay.zip' | sha256sum -c -
+          unzip -qo alpha76_overlay.zip -d work
+          grep -q 'mod_version=0.4.0-alpha.76' work/gradle.properties
+
+      - name: Preflight alpha.76 regression guards
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          test "$(grep -R '@Test' -h src/test/java | wc -l)" -ge 165
+          grep -q 'pokemonCatalog().get("eevee")' src/main/java/com/emipokemon/gacha/machine/GachaMachineBlockEntity.java
+          grep -q 'currentEmiLegendary()' src/main/java/com/emipokemon/gacha/machine/GachaMachineBlockEntity.java
+          grep -q 'getMethod("getPOKEMON")' src/client/java/com/emipokemon/client/render/SeasonalPokemonWorldRenderer.java
+          grep -q 'registerEmiToolRenderer(ModRegistries.EMI_SWORD' src/client/java/com/emipokemon/client/EmipokemonClient.java
+          grep -q 'registerEmiToolRenderer(ModRegistries.EMI_HOE' src/client/java/com/emipokemon/client/EmipokemonClient.java
+          for n in sword pickaxe axe shovel hoe; do
+            grep -q '"parent": "builtin/entity"' "src/main/resources/assets/emipokemon/models/item/emi_${n}.json"
+            test -f "src/main/resources/assets/emipokemon/geo/item/emi_${n}.geo.json"
+            test -f "src/main/resources/assets/emipokemon/textures/item/emi_${n}.png"
+          done
+          test -f src/main/resources/assets/emipokemon/textures/item/emi_tools_3d.png
+          test "$(sha256sum src/main/resources/assets/emipokemon/textures/gui/gacha/standard_gacha.png | cut -d' ' -f1)" = '694aadcaca9a8dcaace9c26a9e43cf41e056203855cd380670d0b7c208f4d98d'
+          test "$(sha256sum src/main/resources/assets/emipokemon/textures/gui/gacha/emi_gacha.png | cut -d' ' -f1)" = '4c61d6a00e324a82d060b8c7b9a3abe40daa437fda8d8efb5a4eaf45b973e216'
+          test "$(sha256sum src/main/resources/assets/emipokemon/textures/block/standard_gacha_machine.png | cut -d' ' -f1)" = '42d060134c7809f2617bcf1aa7a06f02750908eb616fcbbfb3b837dbf98e30cd'
+          test "$(sha256sum src/main/resources/assets/emipokemon/textures/block/emi_gacha_machine.png | cut -d' ' -f1)" = '4d0d76caca51f7d167d3197030d7074e9ac2b7e1ade015c5a01c462ef3e4aea0'
+          test ! -f src/main/resources/assets/emipokemon/textures/gui/gacha/reveal_sheet.png
+
+      - name: Test and build common server and client with Java 21
+        working-directory: work
+        run: |
+          set -euxo pipefail
+          sed -i 's/\r$//' gradlew
+          chmod +x gradlew
+          for attempt in 1 2 3; do
+            if ./gradlew --version --no-daemon; then break; fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            sleep $((attempt * 5))
+          done
+          ./gradlew clean test build --no-daemon --stacktrace
+
+      - name: Verify and package alpha.76 candidate
+        shell: bash
+        run: |
+          set -euxo pipefail
+          jar='work/build/libs/emipokemon-0.4.0-alpha.76.jar'
+          test -f "$jar"
+          unzip -p "$jar" fabric.mod.json | grep -q '0.4.0-alpha.76'
+          for entry in \
+            'com/emipokemon/client/render/SeasonalPokemonWorldRenderer.class' \
+            'com/emipokemon/tools/EmiGeoToolItem.class' \
+            'com/emipokemon/tools/EmiSwordItem.class' \
+            'com/emipokemon/client/render/EmiToolGeoRenderer.class' \
+            'assets/emipokemon/geo/item/emi_sword.geo.json' \
+            'assets/emipokemon/geo/item/emi_pickaxe.geo.json' \
+            'assets/emipokemon/geo/item/emi_axe.geo.json' \
+            'assets/emipokemon/geo/item/emi_shovel.geo.json' \
+            'assets/emipokemon/geo/item/emi_hoe.geo.json' \
+            'assets/emipokemon/textures/item/emi_tools_3d.png'; do
+            unzip -l "$jar" | grep -q "$entry"
+          done
+          if unzip -l "$jar" | grep -q 'textures/gui/gacha/reveal_sheet.png'; then exit 1; fi
+          test "$(unzip -p "$jar" assets/emipokemon/textures/gui/gacha/standard_gacha.png | sha256sum | cut -d' ' -f1)" = '694aadcaca9a8dcaace9c26a9e43cf41e056203855cd380670d0b7c208f4d98d'
+          test "$(unzip -p "$jar" assets/emipokemon/textures/gui/gacha/emi_gacha.png | sha256sum | cut -d' ' -f1)" = '4c61d6a00e324a82d060b8c7b9a3abe40daa437fda8d8efb5a4eaf45b973e216'
+          test "$(unzip -p "$jar" assets/emipokemon/textures/block/standard_gacha_machine.png | sha256sum | cut -d' ' -f1)" = '42d060134c7809f2617bcf1aa7a06f02750908eb616fcbbfb3b837dbf98e30cd'
+          test "$(unzip -p "$jar" assets/emipokemon/textures/block/emi_gacha_machine.png | sha256sum | cut -d' ' -f1)" = '4d0d76caca51f7d167d3197030d7074e9ac2b7e1ade015c5a01c462ef3e4aea0'
+          cd work
+          zip -qr ../Emipokemon-0.4.0-alpha.76-source.zip . -x 'build/*' '.gradle/*'
+          cd ..
+          sha256sum "$jar" Emipokemon-0.4.0-alpha.76-source.zip > SHA256SUMS-0.4.0-alpha.76.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Emipokemon-0.4.0-alpha.76-github-build
+          path: |
+            work/build/libs/emipokemon-0.4.0-alpha.76.jar
+            Emipokemon-0.4.0-alpha.76-source.zip
+            SHA256SUMS-0.4.0-alpha.76.txt
+            work/CHANGELOG-0.4.0-alpha.76.md
+            work/GUIA-PRUEBAS-0.4.0-alpha.76.md
+          if-no-files-found: error
