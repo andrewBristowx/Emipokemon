@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   build:
@@ -17,38 +18,28 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - name: Download exact alpha.62 source candidate
+      - name: Download exact validated alpha.70 source artifact
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euxo pipefail
           curl -fL --retry 3 --retry-delay 2 \
-            'https://drive.usercontent.google.com/download?id=1U3KGE4F-Xs1NmxJOpyXALoCD-ZICMhTm&export=download&confirm=t' \
-            -o alpha62-source.zip
-          echo '56cdf22219db733383da8fc20db48930105167b01571d2ac381a7c1a05e5ba6b  alpha62-source.zip' | sha256sum -c -
-          mkdir work
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            'https://api.github.com/repos/andrewBristowx/Emipokemon/actions/artifacts/9163989453/zip' \
+            -o alpha70-artifact.zip
+          mkdir alpha70-artifact work
+          unzip -q alpha70-artifact.zip -d alpha70-artifact
+          echo '746b69b06dee3ef553a2c96eb1701d147e0c896c9eaea6c8e5bba1f3e8ebacfa  alpha70-artifact/Emipokemon-0.4.0-alpha.70-source.zip' | sha256sum -c -
           unzip_rc=0
-          unzip -q alpha62-source.zip -d work || unzip_rc=$?
+          unzip -q alpha70-artifact/Emipokemon-0.4.0-alpha.70-source.zip -d work || unzip_rc=$?
           test "$unzip_rc" -le 1
           chmod -R u+rwX work
-      - name: Reconstruct exact alpha.71 candidate
+          grep -q 'mod_version=0.4.0-alpha.70' work/gradle.properties
+      - name: Apply and verify alpha.71 overlay
         working-directory: work
         run: |
-          python3 "$GITHUB_WORKSPACE/ci/alpha63_core.py"
-          python3 "$GITHUB_WORKSPACE/ci/alpha63_tests.py"
-          python3 "$GITHUB_WORKSPACE/ci/alpha64_core.py"
-          python3 "$GITHUB_WORKSPACE/ci/alpha64_tests.py"
-          python3 "$GITHUB_WORKSPACE/ci/alpha65_core.py"
-          python3 "$GITHUB_WORKSPACE/ci/alpha65_tests.py"
-          python3 "$GITHUB_WORKSPACE/ci/alpha66_core.py"
-          python3 "$GITHUB_WORKSPACE/ci/alpha66_tests.py"
-          python3 "$GITHUB_WORKSPACE/ci/alpha67_core.py"
-          python3 "$GITHUB_WORKSPACE/ci/alpha67_tests.py"
-          python3 "$GITHUB_WORKSPACE/ci/alpha68_core.py"
-          python3 "$GITHUB_WORKSPACE/ci/alpha68_tests.py"
-          python3 "$GITHUB_WORKSPACE/ci/alpha69_core.py"
-          python3 "$GITHUB_WORKSPACE/ci/alpha69_tests.py"
-          python3 "$GITHUB_WORKSPACE/ci/alpha70_core.py"
-          python3 "$GITHUB_WORKSPACE/ci/alpha70_tests.py"
           python3 "$GITHUB_WORKSPACE/ci/alpha71_core.py"
           python3 "$GITHUB_WORKSPACE/ci/alpha71_tests.py"
       - name: Test and build common, server and client with Java 21
