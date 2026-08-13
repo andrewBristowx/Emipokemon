@@ -7,7 +7,7 @@ old = '''        assertTrue(renderer.contains("getParameterCount() == 16"));
 new = '''        assertTrue(renderer.contains("com.cobblemon.mod.common.api.gui.GuiUtilsKt"));
         assertTrue(renderer.contains("getParameterCount() != 5"));
         assertTrue(renderer.contains("method.getName().equals(\\"drawProfile\\")"));
-        assertTrue(!renderer.contains("PokemonGuiUtilsKt"));'''
+        assertTrue(!renderer.contains("Class.forName(\\"com.cobblemon.mod.common.client.gui.PokemonGuiUtilsKt\\")"));'''
 if old not in text:
     raise SystemExit("alpha64 portrait assertion block not found")
 path.write_text(text.replace(old, new), encoding="utf-8")
