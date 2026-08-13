@@ -1,0 +1,59 @@
+name: alpha56-roulette-canonical-colors-build
+
+on:
+  push:
+    branches: [release/0.4.0-alpha.56]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: python3 -m pip install --disable-pip-version-check pillow
+      - name: Reconstruct exact candidate
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 3 --retry-delay 2 \
+            'https://drive.usercontent.google.com/download?id=1pfp3rREGl5IBAAnV5tKLCMdupi34Mce2&export=download&confirm=t' \
+            -o alpha48-source.zip
+          echo 'bd5ce85b5534c632ee8761c9c7a494fb2806046bd29d5d70ffe876cc10dc6119  alpha48-source.zip' | sha256sum -c -
+          mkdir work
+          unzip -q alpha48-source.zip -d work
+          cd work
+          git apply -p0 "$GITHUB_WORKSPACE/ci/alpha49_visual_and_server.patch"
+          for version in 49 50 51 52 53 54 55 56; do
+            python3 "$GITHUB_WORKSPACE/ci/alpha${version}_core.py"
+            python3 "$GITHUB_WORKSPACE/ci/alpha${version}_tests.py"
+          done
+      - name: Test and build with Java 21
+        shell: bash
+        working-directory: work
+        run: |
+          sed -i 's/\r$//' gradlew
+          chmod +x gradlew
+          ./gradlew clean test build --no-daemon --stacktrace
+      - name: Verify artifact
+        shell: bash
+        run: |
+          set -euxo pipefail
+          test -f work/build/libs/emipokemon-0.4.0-alpha.56.jar
+          unzip -p work/build/libs/emipokemon-0.4.0-alpha.56.jar fabric.mod.json | grep -q '0.4.0-alpha.56'
+          sha256sum work/build/libs/emipokemon-0.4.0-alpha.56.jar | tee SHA256SUMS-0.4.0-alpha.56.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Emipokemon-0.4.0-alpha.56-github-build
+          path: |
+            work/build/libs/emipokemon-0.4.0-alpha.56.jar
+            SHA256SUMS-0.4.0-alpha.56.txt
+          if-no-files-found: error

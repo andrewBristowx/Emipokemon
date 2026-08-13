@@ -1,0 +1,98 @@
+plugins {
+    id 'fabric-loom' version "${loom_version}"
+    id 'maven-publish'
+}
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+    archivesName = project.archives_base_name
+}
+
+repositories {
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = 'Modrinth'
+                url = 'https://api.modrinth.com/maven'
+            }
+        }
+        filter {
+            includeGroup 'maven.modrinth'
+        }
+    }
+    maven {
+        name = 'GeckoLib'
+        url = 'https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/'
+        content {
+            includeGroup 'software.bernie.geckolib'
+        }
+    }
+    mavenCentral()
+}
+
+configurations.configureEach {
+    resolutionStrategy.force "net.fabricmc:fabric-loader:${project.loader_version}"
+}
+
+loom {
+    splitEnvironmentSourceSets()
+
+    mods {
+        emipokemon {
+            sourceSet sourceSets.main
+            sourceSet sourceSets.client
+        }
+    }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+    modImplementation "net.fabricmc:fabric-language-kotlin:${project.fabric_kotlin_version}"
+
+    modImplementation "maven.modrinth:MdwFAVRL:${project.cobblemon_version_id}"
+    modImplementation "software.bernie.geckolib:geckolib-fabric-${project.minecraft_version}:${project.geckolib_version}"
+
+    if (project.hasProperty('cobbleverse_runtime_dir')) {
+        modRuntimeOnly fileTree(dir: project.property('cobbleverse_runtime_dir'), include: [
+                'Cobblemon-fabric-1.7.3+1.21.1.jar',
+                'rctapi-fabric-1.21.1-0.15.2-beta.jar',
+                'rctmod-fabric-1.21.1-0.18.1-beta.jar',
+                'LumyMon-0.6.6.jar',
+                'pokeblocks-1.4.0-1.21.1.jar',
+                'architectury-13.0.8-fabric.jar',
+                'ForgeConfigAPIPort-v21.1.6-1.21.1-Fabric.jar'
+        ])
+    }
+
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+}
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+}
+
+processResources {
+    inputs.property 'version', project.version
+    filesMatching('fabric.mod.json') {
+        expand 'version': project.version
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    it.options.release = 21
+    it.options.encoding = 'UTF-8'
+}
+
+java {
+    withSourcesJar()
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
