@@ -19,4 +19,14 @@ replace_once(
     'assertTrue(renderer.contains("2.78D + bob"));',
     'assertTrue(renderer.contains("4.18D + bob"));'
 )
+replace_once(
+    root / 'src/test/java/com/emipokemon/alpha69/Alpha69GachaFixesRegressionTest.java',
+    'assertTrue(renderer.contains("1.45F / width"));',
+    'assertTrue(renderer.contains("1.25F / width"));'
+)
+replace_once(
+    root / 'src/test/java/com/emipokemon/alpha69/Alpha69GachaFixesRegressionTest.java',
+    'assertTrue(renderer.contains("1.35F / height"));',
+    'assertTrue(renderer.contains("1.05F / height"));'
+)
 print('alpha.74 inherited regression expectations updated')
