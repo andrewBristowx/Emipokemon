@@ -1,0 +1,147 @@
+name: alpha45-roulette-build
+
+on:
+  push:
+    branches: [release/0.4.0-alpha.45]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Download exact alpha.27 source baseline
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 3 --retry-delay 2 \
+            'https://drive.usercontent.google.com/download?id=1hW1-TH2UK6c2BIwZae7ux6zSM3opL10N&export=download&confirm=t' \
+            -o alpha27-source.zip
+          echo 'a7e5545668760f84d036ee017622d32d9b8fa0ffe4b77cfdae10d40c820abf4b  alpha27-source.zip' | sha256sum -c -
+          rm -rf work ci-history
+          mkdir work ci-history
+          unzip -q alpha27-source.zip -d work
+
+      - name: Fetch exact historical transforms and isolated alpha42 model fix
+        shell: bash
+        run: |
+          set -euxo pipefail
+          base34='https://raw.githubusercontent.com/andrewBristowx/Emipokemon/2494bdfcbaa1b282962178d67d82ad136b404811/ci'
+          for f in alpha29_apply.py alpha30_apply.py alpha31_apply.py alpha31_compile_fix.py alpha32_client_path.py alpha32_apply.py alpha33_apply.py alpha34_apply.py alpha34_test_fix.py; do
+            curl -fL --retry 3 "$base34/$f" -o "ci-history/$f"
+          done
+          curl -fL --retry 3 'https://raw.githubusercontent.com/andrewBristowx/Emipokemon/56eca300953a194b13596c17f064430c7f383ded/ci/alpha35_apply.py' -o ci-history/alpha35_apply.py
+          curl -fL --retry 3 'https://raw.githubusercontent.com/andrewBristowx/Emipokemon/0691f7206a9bf6674c9843fc339d43de2e96aca9/ci/alpha41_models.py' -o ci-history/alpha42_models_fix.py
+
+      - name: Reconstruct alpha.44 and apply alpha.45 roulette presentation
+        shell: bash
+        working-directory: work
+        run: |
+          set -euxo pipefail
+          python3 "$GITHUB_WORKSPACE/ci-history/alpha29_apply.py"
+          python3 "$GITHUB_WORKSPACE/ci-history/alpha30_apply.py"
+          python3 "$GITHUB_WORKSPACE/ci-history/alpha31_apply.py"
+          python3 "$GITHUB_WORKSPACE/ci-history/alpha31_compile_fix.py"
+          python3 "$GITHUB_WORKSPACE/ci-history/alpha32_client_path.py"
+          python3 "$GITHUB_WORKSPACE/ci-history/alpha32_apply.py"
+          rm -f src/client/java/com/emipokemon/EmipokemonClient.java
+          python3 "$GITHUB_WORKSPACE/ci-history/alpha33_apply.py"
+          python3 "$GITHUB_WORKSPACE/ci-history/alpha34_apply.py"
+          python3 "$GITHUB_WORKSPACE/ci-history/alpha34_test_fix.py"
+          python3 "$GITHUB_WORKSPACE/ci-history/alpha35_apply.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha36_server.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha36_client.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha36_visual.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha36_tests.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha37_core.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha37_visual.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha37_tests.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha38_core.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha38_models.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha38_textures.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha38_tests.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha39_core.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha39_models.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha39_compile_fix.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha39_textures.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha39_tests.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha40_core.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha40_models.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha40_tests.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha42_core.py"
+          python3 "$GITHUB_WORKSPACE/ci-history/alpha42_models_fix.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha42_model_followup.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha42_tests.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha43_core.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha43_server.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha43_client.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha43_tests.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha44_core.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha44_tests.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha45_core.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha45_server.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha45_client.py"
+          python3 "$GITHUB_WORKSPACE/ci/alpha45_tests.py"
+
+      - name: Verify alpha.45 functional roulette invariants
+        shell: bash
+        run: |
+          set -euxo pipefail
+          grep -q '^mod_version=0.4.0-alpha.45' work/gradle.properties
+          grep -q 'List<Integer> recentResults' work/src/main/java/com/emipokemon/casino/CasinoNetworking.java
+          grep -q 'rouletteHistory.addFirst(number)' work/src/main/java/com/emipokemon/casino/CasinoTableService.java
+          grep -q 'QuickChipZone' work/src/client/java/com/emipokemon/client/casino/CasinoScreen.java
+          grep -q 'Selecciona una casilla' work/src/client/java/com/emipokemon/client/casino/CasinoScreen.java
+          ! grep -q 'Haz clic directamente sobre el tapete para colocar tu ficha' work/src/client/java/com/emipokemon/client/casino/CasinoScreen.java
+          grep -q 'drawRecentResults' work/src/client/java/com/emipokemon/client/casino/CasinoScreen.java
+          grep -q 'public void renderBackground(DrawContext context' work/src/client/java/com/emipokemon/client/casino/CasinoScreen.java
+          grep -q 'Deliberately empty: the casino draws its own dim backdrop' work/src/client/java/com/emipokemon/client/casino/CasinoScreen.java
+          grep -q 'column1' work/src/main/java/com/emipokemon/casino/CasinoTableService.java
+          grep -q 'RANDOM.nextInt(37)' work/src/main/java/com/emipokemon/casino/CasinoTableService.java
+
+      - name: Normalize Gradle wrapper
+        shell: bash
+        working-directory: work
+        run: |
+          sed -i 's/\r$//' gradlew
+          chmod +x gradlew
+
+      - name: Test and build with Java 21
+        shell: bash
+        working-directory: work
+        run: ./gradlew clean test build --no-daemon --stacktrace
+
+      - name: Verify built version and generate checksums
+        shell: bash
+        run: |
+          set -euxo pipefail
+          test -f work/build/libs/emipokemon-0.4.0-alpha.45.jar
+          unzip -p work/build/libs/emipokemon-0.4.0-alpha.45.jar fabric.mod.json | grep -q '0.4.0-alpha.45'
+          sha256sum work/build/libs/*.jar | tee SHA256SUMS-0.4.0-alpha.45-github.txt
+          cd work
+          zip -qr ../Emipokemon-0.4.0-alpha.45-source.zip . -x 'build/*' '.gradle/*'
+          cd ..
+          sha256sum Emipokemon-0.4.0-alpha.45-source.zip >> SHA256SUMS-0.4.0-alpha.45-github.txt
+
+      - name: Upload alpha.45 build
+        uses: actions/upload-artifact@v4
+        with:
+          name: Emipokemon-0.4.0-alpha.45-github-build
+          path: |
+            work/build/libs/*.jar
+            Emipokemon-0.4.0-alpha.45-source.zip
+            SHA256SUMS-0.4.0-alpha.45-github.txt
+          if-no-files-found: error
