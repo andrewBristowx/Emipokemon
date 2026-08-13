@@ -8,13 +8,13 @@ root = Path(__file__).resolve().parents[1]
 ci = root / "ci"
 target = Path.cwd().resolve()
 
-parts = [ci / f"alpha70_overlay_{index:02d}.b64part" for index in range(6)]
+parts = [ci / f"alpha70_overlay_v2_{index:02d}.b64part" for index in range(13)]
 missing = [part.name for part in parts if not part.is_file()]
 if missing:
     raise SystemExit(f"alpha70 overlay chunks missing: {missing}")
 encoded = "".join(part.read_text(encoding="ascii") for part in parts)
 archive_bytes = base64.b64decode(encoded, validate=True)
-if hashlib.sha256(archive_bytes).hexdigest() != "b53fe78369b1bff8616300ec4b399e6567138f40274d17e388c6224e3529dc06":
+if hashlib.sha256(archive_bytes).hexdigest() != "e4049af300403f77763d831ef3b186df63ac5d7ba85f55cb0659798398a71777":
     raise SystemExit("alpha70 overlay checksum mismatch")
 
 properties = (target / "gradle.properties").read_text(encoding="utf-8")
