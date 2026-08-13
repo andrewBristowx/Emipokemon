@@ -1,0 +1,22 @@
+{
+  "key.emipokemon.quests": "Abrir diario de misiones",
+  "category.emipokemon": "Emipokemon",
+  "item.emipokemon.gacha_ticket": "Ticket Gacha",
+  "item.emipokemon.emi_special_banner_ticket": "Ticket Especial de Emi",
+  "item.emipokemon.casino_chip": "Ficha del casino",
+  "item.emipokemon.claw_ticket": "Ticket de garra",
+  "block.emipokemon.standard_gacha_machine": "Máquina Gacha Emipokemon",
+  "block.emipokemon.emi_gacha_machine": "Máquina Gacha de Emi",
+  "block.emipokemon.gacha_machine_top": "Parte superior de Máquina Gacha",
+  "block.emipokemon.slot_machine": "Máquina tragamonedas",
+  "block.emipokemon.michicoin_chip_machine": "Máquina de fichas Michicoin",
+  "block.emipokemon.ticket_machine": "Máquina de tickets",
+  "block.emipokemon.casino_roulette": "Ruleta del casino",
+  "block.emipokemon.poker_table": "Mesa de póker",
+  "block.emipokemon.blackjack_table": "Mesa de blackjack",
+  "block.emipokemon.dice_table": "Mesa de dados",
+  "block.emipokemon.claw_machine": "Máquina de garra de peluches",
+  "block.emipokemon.pokemon_wager_table": "Mesa de cara o sello Pokémon",
+  "entity.emipokemon.nurse_npc": "Enfermera Emi",
+  "entity.emipokemon.shop_npc": "Vendedor Poké Mart"
+}

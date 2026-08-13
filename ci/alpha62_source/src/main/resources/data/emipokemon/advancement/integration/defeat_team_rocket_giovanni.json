@@ -1,0 +1,17 @@
+{
+  "criteria": {
+    "team_rocket_giovanni_defeated": {
+      "trigger": "rctmod:defeat_count",
+      "conditions": {
+        "trainer_ids": [
+          "team_rocket_giovanni"
+        ]
+      }
+    }
+  },
+  "requirements": [
+    [
+      "team_rocket_giovanni_defeated"
+    ]
+  ]
+}
