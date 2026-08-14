@@ -1,0 +1,96 @@
+name: alpha88-build
+
+on:
+  push:
+    branches: [release/0.4.0-alpha.88]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Restore alpha.86 source base
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 3 --retry-delay 2 \
+            'https://drive.usercontent.google.com/download?id=1db1PrnUPDNyQfDayQVQnleyYcm4a6R-X&export=download&confirm=t' \
+            -o alpha86-source.zip
+          echo '578df54308243491e3a87bcb017600934fd016369afd67e18453fb330e101e93  alpha86-source.zip' | sha256sum -c -
+          mkdir extracted
+          unzip -q alpha86-source.zip -d extracted
+          mv extracted/emipokemon_alpha82_src work
+
+      - name: Apply alpha.88 patch
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sed -i 's/mod_version=0.4.0-alpha.86/mod_version=0.4.0-alpha.88/' gradle.properties
+          sed -i 's/VERSION = "0.4.0-alpha.86"/VERSION = "0.4.0-alpha.88"/' src/main/java/com/emipokemon/Emipokemon.java
+          python ../ci/alpha88/patch_alpha88.py
+          mkdir -p src/test/java/com/emipokemon/alpha88
+          cp ../ci/alpha88/Alpha88EmiArmorHeartAndHelmetRegressionTest.java src/test/java/com/emipokemon/alpha88/
+          cat > CHANGELOG-0.4.0-alpha.88.md <<'EOF'
+          # Emipokemon 0.4.0-alpha.88
+          - Elimina los paneles blancos/frontales restantes del casco Emi.
+          - Recoloca el corazón del casco como detalle plano visible con un mínimo relieve.
+          - Recoloca el corazón de la pechera como detalle plano visible con un mínimo relieve.
+          - Conserva botas y grebas/pantalones de la versión anterior.
+          EOF
+
+      - name: Preflight alpha.88
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          grep -q 'mod_version=0.4.0-alpha.88' gradle.properties
+          grep -q 'VERSION = "0.4.0-alpha.88"' src/main/java/com/emipokemon/Emipokemon.java
+          grep -q '"name": "helmet_heart"' src/main/resources/assets/emipokemon/geo/armor/emi_armor.geo.json
+          grep -q '"name": "heart_core"' src/main/resources/assets/emipokemon/geo/armor/emi_armor.geo.json
+
+      - name: Compile alpha.88 with Java 21
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sed -i 's/\r$//' gradlew
+          chmod +x gradlew
+          ./gradlew clean build -x test --no-daemon --stacktrace
+
+      - name: Run alpha.88 regression test
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          ./gradlew test --tests com.emipokemon.alpha88.Alpha88EmiArmorHeartAndHelmetRegressionTest --no-daemon --stacktrace
+
+      - name: Verify and package alpha.88
+        shell: bash
+        run: |
+          set -euxo pipefail
+          jar='work/build/libs/emipokemon-0.4.0-alpha.88.jar'
+          test -f "$jar"
+          unzip -p "$jar" fabric.mod.json | grep -q '0.4.0-alpha.88'
+          unzip -l "$jar" | grep -q 'assets/emipokemon/geo/armor/emi_armor.geo.json'
+          sha256sum "$jar" > SHA256SUMS-0.4.0-alpha.88.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Emipokemon-0.4.0-alpha.88-github-build
+          path: |
+            work/build/libs/emipokemon-0.4.0-alpha.88.jar
+            SHA256SUMS-0.4.0-alpha.88.txt
+            work/CHANGELOG-0.4.0-alpha.88.md
+          if-no-files-found: error
