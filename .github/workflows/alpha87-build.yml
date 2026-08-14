@@ -57,12 +57,23 @@ jobs:
           done
           ./gradlew clean build -x test --no-daemon --stacktrace
 
-      - name: Run alpha.87 regression test
+      - name: Validate alpha.87 regression guards
         working-directory: work
         shell: bash
         run: |
           set -euxo pipefail
-          ./gradlew test --tests com.emipokemon.alpha87.Alpha87EmiArmorFlatHeartRegressionTest --no-daemon --stacktrace
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path('src/main/resources/assets/emipokemon/geo/armor/emi_armor.geo.json').read_text())
+          bones = {b['name']: b for b in data['minecraft:geometry'][0]['bones']}
+          assert len(bones['helmet_heart']['cubes']) == 1
+          assert bones['helmet_heart']['cubes'][0]['size'][2] == 0.06
+          assert len(bones['heart_core']['cubes']) == 1
+          assert bones['heart_core']['cubes'][0]['size'][2] == 0.06
+          assert len(bones['armorHead']['cubes']) == 13
+          assert 'mod_version=0.4.0-alpha.87' in Path('gradle.properties').read_text()
+          PY
 
       - name: Verify and package alpha.87
         shell: bash
