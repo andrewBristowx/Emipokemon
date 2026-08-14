@@ -1,0 +1,87 @@
+name: alpha78-build
+
+on:
+  push:
+    branches: [release/0.4.0-alpha.78]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Download exact alpha.78 source candidate
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 3 --retry-delay 2 \
+            'https://drive.usercontent.google.com/download?id=1LH1B3MzHoyMuhjds_1XiQ7eWtodPoIE1&export=download&confirm=t' \
+            -o alpha78-source.zip
+          echo '9a9fd489bd9f5c5afb0be7336824693f41ee70ef904c953885f07238ecfc3b75  alpha78-source.zip' | sha256sum -c -
+          mkdir work
+          unzip -q alpha78-source.zip -d work
+          chmod -R u+rwX work
+          grep -q 'mod_version=0.4.0-alpha.78' work/gradle.properties
+          grep -q '0.4.0-alpha.78' work/src/main/java/com/emipokemon/Emipokemon.java
+
+      - name: Preflight alpha.78 changes
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          grep -q '"GASHA NORMAL"' src/client/java/com/emipokemon/client/render/SeasonalPokemonWorldRenderer.java
+          grep -q 'machine.isEmiThemed() ? 1.7F : 1.5F' src/client/java/com/emipokemon/client/render/SeasonalPokemonWorldRenderer.java
+          grep -q '5.02D + bob' src/client/java/com/emipokemon/client/render/SeasonalPokemonWorldRenderer.java
+          grep -q 'forceEmiLegendary' src/main/java/com/emipokemon/gacha/banner/FeaturedRotationService.java
+          grep -q 'literal("featured")' src/main/java/com/emipokemon/command/GachaCommands.java
+          grep -q 'literal("force")' src/main/java/com/emipokemon/command/GachaCommands.java
+          grep -q 'literal("clear")' src/main/java/com/emipokemon/command/GachaCommands.java
+          for n in sword pickaxe axe shovel hoe; do
+            grep -q '"parent": "builtin/entity"' "src/main/resources/assets/emipokemon/models/item/emi_${n}.json"
+            grep -q '0.56' "src/main/resources/assets/emipokemon/models/item/emi_${n}.json"
+            test -f "src/main/resources/assets/emipokemon/geo/item/emi_${n}.geo.json"
+          done
+          test "$(sha256sum src/main/resources/assets/emipokemon/textures/gui/gacha/standard_gacha.png | cut -d' ' -f1)" = '694aadcaca9a8dcaace9c26a9e43cf41e056203855cd380670d0b7c208f4d98d'
+          test "$(sha256sum src/main/resources/assets/emipokemon/textures/gui/gacha/emi_gacha.png | cut -d' ' -f1)" = '4c61d6a00e324a82d060b8c7b9a3abe40daa437fda8d8efb5a4eaf45b973e216'
+          test ! -f src/main/resources/assets/emipokemon/textures/gui/gacha/reveal_sheet.png
+
+      - name: Test and build with Java 21
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sed -i 's/\r$//' gradlew
+          chmod +x gradlew
+          ./gradlew clean test build --no-daemon --stacktrace
+
+      - name: Verify alpha.78 JAR
+        shell: bash
+        run: |
+          set -euxo pipefail
+          jar='work/build/libs/emipokemon-0.4.0-alpha.78.jar'
+          test -f "$jar"
+          unzip -p "$jar" fabric.mod.json | grep -q '0.4.0-alpha.78'
+          unzip -l "$jar" | grep -q 'com/emipokemon/client/render/SeasonalPokemonWorldRenderer.class'
+          unzip -l "$jar" | grep -q 'com/emipokemon/gacha/banner/FeaturedRotationService.class'
+          unzip -l "$jar" | grep -q 'com/emipokemon/command/GachaCommands.class'
+          if unzip -l "$jar" | grep -q 'textures/gui/gacha/reveal_sheet.png'; then exit 1; fi
+          sha256sum "$jar" alpha78-source.zip > SHA256SUMS-0.4.0-alpha.78.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Emipokemon-0.4.0-alpha.78-github-build
+          path: |
+            work/build/libs/emipokemon-0.4.0-alpha.78.jar
+            alpha78-source.zip
+            SHA256SUMS-0.4.0-alpha.78.txt
+            work/CHANGELOG-0.4.0-alpha.78.md
+            work/GUIA-PRUEBAS-0.4.0-alpha.78.md
+          if-no-files-found: error
