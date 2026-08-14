@@ -40,6 +40,7 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
+          mkdir -p work/ci
           cp ci/alpha81_apply.py work/ci/alpha81_apply.py
           cp ci/alpha81_vanilla_armor.py work/ci/alpha81_vanilla_armor.py
           cd work
