@@ -1,0 +1,82 @@
+name: alpha89-build
+
+on:
+  push:
+    branches: [release/0.4.0-alpha.89]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Restore exact alpha.89 source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 3 --retry-delay 2 \
+            'https://drive.usercontent.google.com/download?id=1NS9EYzbG12xNLflkWBbrRojaSPRmcFLc&export=download&confirm=t' \
+            -o alpha89-source.zip
+          echo '0124848157a50d7f6991d132eb6fe4dfe67195eddd9096b5d30e654310371a8e  alpha89-source.zip' | sha256sum -c -
+          mkdir work
+          unzip -q alpha89-source.zip -d work
+          grep -q 'mod_version=0.4.0-alpha.89' work/gradle.properties
+          grep -q 'VERSION = "0.4.0-alpha.89"' work/src/main/java/com/emipokemon/Emipokemon.java
+
+      - name: Preflight heart visibility fix
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          grep -q '"name": "helmet_heart"' src/main/resources/assets/emipokemon/geo/armor/emi_armor.geo.json
+          grep -q -- '-6.0' src/main/resources/assets/emipokemon/geo/armor/emi_armor.geo.json
+          grep -q '"name": "heart_core"' src/main/resources/assets/emipokemon/geo/armor/emi_armor.geo.json
+          grep -q -- '-4.2' src/main/resources/assets/emipokemon/geo/armor/emi_armor.geo.json
+
+      - name: Compile with Java 21
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sed -i 's/\r$//' gradlew
+          chmod +x gradlew
+          ./gradlew clean build -x test --no-daemon --stacktrace
+
+      - name: Run alpha.89 regression test
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          ./gradlew test --tests com.emipokemon.alpha89.Alpha89HeartVisibilityRegressionTest --no-daemon --stacktrace
+
+      - name: Verify and package alpha.89
+        shell: bash
+        run: |
+          set -euxo pipefail
+          jar='work/build/libs/emipokemon-0.4.0-alpha.89.jar'
+          test -f "$jar"
+          unzip -p "$jar" fabric.mod.json | grep -q '0.4.0-alpha.89'
+          unzip -l "$jar" | grep -q 'assets/emipokemon/geo/armor/emi_armor.geo.json'
+          cp alpha89-source.zip Emipokemon-0.4.0-alpha.89-source.zip
+          sha256sum "$jar" Emipokemon-0.4.0-alpha.89-source.zip > SHA256SUMS-0.4.0-alpha.89.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Emipokemon-0.4.0-alpha.89-github-build
+          path: |
+            work/build/libs/emipokemon-0.4.0-alpha.89.jar
+            Emipokemon-0.4.0-alpha.89-source.zip
+            SHA256SUMS-0.4.0-alpha.89.txt
+            work/CHANGELOG-0.4.0-alpha.89.md
+            work/GUIA-PRUEBAS-0.4.0-alpha.89.md
+          if-no-files-found: error
