@@ -46,58 +46,61 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
-          def replace(path, old, new):
+          def must_replace(path, old, new):
               p=Path(path); t=p.read_text()
-              if old not in t: raise SystemExit(f'missing expected text in {path}: {old[:80]}')
+              if old not in t: raise SystemExit(f'missing expected text in {path}')
               p.write_text(t.replace(old,new))
 
-          replace('gradle.properties','mod_version=0.4.0-alpha.77','mod_version=0.4.0-alpha.78')
-          replace('src/main/java/com/emipokemon/Emipokemon.java','0.4.0-alpha.77','0.4.0-alpha.78')
+          must_replace('gradle.properties','mod_version=0.4.0-alpha.77','mod_version=0.4.0-alpha.78')
+          must_replace('src/main/java/com/emipokemon/Emipokemon.java','0.4.0-alpha.77','0.4.0-alpha.78')
 
           p=Path('src/client/java/com/emipokemon/client/render/SeasonalPokemonWorldRenderer.java'); t=p.read_text()
           old='''        MinecraftClient client = MinecraftClient.getInstance();\n        Quaternionf cameraRotation = new Quaternionf(client.getEntityRenderDispatcher().getRotation());\n\n        drawTextLine(matrices, vertices, textRenderer, cameraRotation, 4.18D,\n                machine.isEmiThemed() ? "LEGENDARIO DE EMI" : "POKÉMON DE TEMPORADA",\n                machine.isEmiThemed() ? 0xFFFFA6E4 : 0xFF8DEBFF, -6.0F);\n        drawTextLine(matrices, vertices, textRenderer, cameraRotation, 4.18D,\n                displayName == null || displayName.isBlank() ? "Sincronizando…" : displayName,\n                0xFFFFFFFF, 6.0F);'''
-          new='''        String title = machine.isEmiThemed() ? "LEGENDARIO DE EMI" : "GASHA NORMAL";\n        String subtitle = machine.isEmiThemed() ? (displayName == null || displayName.isBlank() ? "Sincronizando…" : displayName) : "";\n\n        MinecraftClient client = MinecraftClient.getInstance();\n        Quaternionf cameraRotation = new Quaternionf(client.getEntityRenderDispatcher().getRotation());\n\n        drawTextLine(matrices, vertices, textRenderer, cameraRotation, 4.18D,\n                title, machine.isEmiThemed() ? 0xFFFFA6E4 : 0xFF8DEBFF, machine.isEmiThemed() ? -6.0F : 0.0F);\n        drawTextLine(matrices, vertices, textRenderer, cameraRotation, 4.18D,\n                subtitle, 0xFFFFFFFF, 6.0F);'''
-          if old not in t: raise SystemExit('renderer text block not found')
+          new='''        String title = machine.isEmiThemed() ? "LEGENDARIO DE EMI" : "GASHA NORMAL";\n        String subtitle = machine.isEmiThemed() ? (displayName == null || displayName.isBlank() ? "Sincronizando…" : displayName) : "";\n\n        MinecraftClient client = MinecraftClient.getInstance();\n        Quaternionf cameraRotation = new Quaternionf(client.getEntityRenderDispatcher().getRotation());\n\n        drawTextLine(matrices, vertices, textRenderer, cameraRotation, 4.18D,\n                title, machine.isEmiThemed() ? 0xFFFFA6E4 : 0xFF8DEBFF, machine.isEmiThemed() ? -6.0F : 0.0F);\n        drawTextLine(matrices, vertices, textRenderer, cameraRotation, 4.18D, subtitle, 0xFFFFFFFF, 6.0F);'''
+          if old not in t: raise SystemExit('renderer text block missing')
           t=t.replace(old,new).replace('matrices.translate(0.5D, 4.92D + bob, 0.5D);','matrices.translate(0.5D, 5.02D + bob, 0.5D);').replace('matrices.scale(1.05F, 1.05F, 1.05F);','matrices.scale(machine.isEmiThemed() ? 1.7F : 1.5F, machine.isEmiThemed() ? 1.7F : 1.5F, machine.isEmiThemed() ? 1.7F : 1.5F);')
           p.write_text(t)
 
           p=Path('src/main/java/com/emipokemon/gacha/banner/FeaturedRotationService.java'); t=p.read_text()
           old='''        long bucket = rotationBucket(epochMillis);\n        PokemonCatalogEntry selected = state == null ? null : catalog.get(state.speciesId);'''
           new='''        long bucket = rotationBucket(epochMillis);\n        if (state != null && state.forcedSpeciesId != null && !state.forcedSpeciesId.isBlank()) {\n            PokemonCatalogEntry forced = catalog.get(state.forcedSpeciesId);\n            if (forced != null && forced.tier() == GachaTier.LEGENDARY) return forced;\n            state.forcedSpeciesId = "";\n            saveState();\n        }\n        PokemonCatalogEntry selected = state == null ? null : catalog.get(state.speciesId);'''
-          if old not in t: raise SystemExit('rotation selection block not found')
+          if old not in t: raise SystemExit('rotation block missing')
           t=t.replace(old,new)
           marker='''    /** The complete implemented LEGENDARY pool, sorted for stable admin/debug output. */\n    public synchronized List<PokemonCatalogEntry> legendaryPool() {'''
           methods='''    public synchronized PokemonCatalogEntry forceEmiLegendary(String speciesId) {\n        PokemonCatalogEntry entry = catalog.get(speciesId);\n        if (entry == null || entry.tier() != GachaTier.LEGENDARY) return null;\n        ensureLoaded();\n        if (state == null) state = new RotationState();\n        state.forcedSpeciesId = entry.speciesId();\n        saveState();\n        return entry;\n    }\n\n    public synchronized PokemonCatalogEntry clearForcedEmiLegendary() {\n        ensureLoaded();\n        if (state != null) { state.forcedSpeciesId = ""; saveState(); }\n        return currentEmiLegendary(System.currentTimeMillis());\n    }\n\n    public synchronized PokemonCatalogEntry forcedEmiLegendary() {\n        ensureLoaded();\n        if (state == null || state.forcedSpeciesId == null || state.forcedSpeciesId.isBlank()) return null;\n        PokemonCatalogEntry entry = catalog.get(state.forcedSpeciesId);\n        return entry != null && entry.tier() == GachaTier.LEGENDARY ? entry : null;\n    }\n\n    /** The complete implemented LEGENDARY pool, sorted for stable admin/debug output. */\n    public synchronized List<PokemonCatalogEntry> legendaryPool() {'''
-          if marker not in t: raise SystemExit('legendaryPool marker not found')
+          if marker not in t: raise SystemExit('pool marker missing')
           t=t.replace(marker,methods).replace('String speciesId = "";\n        long standardBucket', 'String speciesId = "";\n        String forcedSpeciesId = "";\n        long standardBucket')
           p.write_text(t)
 
           p=Path('src/main/java/com/emipokemon/command/GachaCommands.java'); t=p.read_text()
           t=t.replace('import com.emipokemon.gacha.banner.BannerManager;','import com.emipokemon.gacha.banner.BannerManager;\nimport com.emipokemon.gacha.banner.FeaturedRotationService;')
           t=t.replace('register(dispatcher, catalog, banners, gacha, playerData));','register(dispatcher, catalog, banners, gacha, playerData, com.emipokemon.Emipokemon.featuredRotation()));')
-          t=t.replace('''            GachaService gacha,\n            PlayerDataManager playerData\n    ) {''','''            GachaService gacha,\n            PlayerDataManager playerData,\n            FeaturedRotationService featuredRotation\n    ) {''',1)
+          old_private='''    private static void register(\n            CommandDispatcher<ServerCommandSource> dispatcher,\n            PokemonCatalogService catalog,\n            BannerManager banners,\n            GachaService gacha,\n            PlayerDataManager playerData\n    ) {'''
+          new_private='''    private static void register(\n            CommandDispatcher<ServerCommandSource> dispatcher,\n            PokemonCatalogService catalog,\n            BannerManager banners,\n            GachaService gacha,\n            PlayerDataManager playerData,\n            FeaturedRotationService featuredRotation\n    ) {'''
+          if old_private not in t: raise SystemExit('private register signature missing')
+          t=t.replace(old_private,new_private)
           anchor='''                        .then(literal("reload")\n                                .requires(source -> source.hasPermissionLevel(4))'''
           featured='''                        .then(literal("featured")\n                                .requires(source -> source.hasPermissionLevel(4))\n                                .then(literal("emi")\n                                        .then(literal("current").executes(context -> {\n                                            PokemonCatalogEntry forced = featuredRotation.forcedEmiLegendary();\n                                            PokemonCatalogEntry current = featuredRotation.currentEmiLegendary();\n                                            String suffix = forced != null ? " | forzado=" + forced.displayName() : "";\n                                            context.getSource().sendFeedback(() -> Text.literal(current == null ? "No hay legendario actual de Emi todavía." : "Legendario actual de Emi: " + current.displayName() + suffix), false);\n                                            return current == null ? 0 : 1;\n                                        }))\n                                        .then(literal("force").then(argument("pokemon", StringArgumentType.word()).executes(context -> {\n                                            String id = StringArgumentType.getString(context, "pokemon");\n                                            PokemonCatalogEntry entry = featuredRotation.forceEmiLegendary(id);\n                                            if (entry == null) { context.getSource().sendError(Text.literal("Debes indicar un Pokemon legendario válido del catálogo: " + id)); return 0; }\n                                            context.getSource().sendFeedback(() -> Text.literal("Legendario de Emi forzado a: " + entry.displayName() + " (los gashas se actualizarán en pocos segundos)."), true);\n                                            return 1;\n                                        })))\n                                        .then(literal("clear").executes(context -> {\n                                            PokemonCatalogEntry current = featuredRotation.clearForcedEmiLegendary();\n                                            context.getSource().sendFeedback(() -> Text.literal(current == null ? "Se limpió el forzado del legendario de Emi." : "Se limpió el forzado del legendario de Emi. Ahora rota: " + current.displayName()), true);\n                                            return 1;\n                                        }))))\n'''
-          if anchor not in t: raise SystemExit('gacha reload anchor not found')
+          if anchor not in t: raise SystemExit('reload anchor missing')
           p.write_text(t.replace(anchor,featured+anchor))
 
-          old_right='''"thirdperson_righthand": {\n      "rotation": [\n        0,\n        -90,\n        55\n      ],\n      "translation": [\n        0,\n        4,\n        0.5\n      ],\n      "scale": [\n        0.72,\n        0.72,\n        0.72\n      ]\n    }'''
-          new_right='''"thirdperson_righthand": {\n      "rotation": [0, -90, 42],\n      "translation": [0, 2.75, 0],\n      "scale": [0.56, 0.56, 0.56]\n    }'''
-          old_left='''"thirdperson_lefthand": {\n      "rotation": [\n        0,\n        90,\n        -55\n      ],\n      "translation": [\n        0,\n        4,\n        0.5\n      ],\n      "scale": [\n        0.72,\n        0.72,\n        0.72\n      ]\n    }'''
-          new_left='''"thirdperson_lefthand": {\n      "rotation": [0, 90, -42],\n      "translation": [0, 2.75, 0],\n      "scale": [0.56, 0.56, 0.56]\n    }'''
+          old_r='''"thirdperson_righthand": {\n      "rotation": [\n        0,\n        -90,\n        55\n      ],\n      "translation": [\n        0,\n        4,\n        0.5\n      ],\n      "scale": [\n        0.72,\n        0.72,\n        0.72\n      ]\n    }'''
+          new_r='''"thirdperson_righthand": {\n      "rotation": [0, -90, 42],\n      "translation": [0, 2.75, 0],\n      "scale": [0.56, 0.56, 0.56]\n    }'''
+          old_l=old_r.replace('-90','90').replace('55','-55')
+          new_l='''"thirdperson_lefthand": {\n      "rotation": [0, 90, -42],\n      "translation": [0, 2.75, 0],\n      "scale": [0.56, 0.56, 0.56]\n    }'''
+          old_l=old_l.replace('thirdperson_righthand','thirdperson_lefthand')
           for n in ('sword','pickaxe','axe','shovel','hoe'):
               p=Path(f'src/main/resources/assets/emipokemon/models/item/emi_{n}.json'); m=p.read_text()
-              if old_right not in m or old_left not in m: raise SystemExit(f'third person transforms missing: {n}')
-              p.write_text(m.replace(old_right,new_right).replace(old_left,new_left))
+              if old_r not in m or old_l not in m: raise SystemExit(f'tool transform missing {n}')
+              p.write_text(m.replace(old_r,new_r).replace(old_l,new_l))
 
           for p in Path('src/test').rglob('*.java'):
               s=p.read_text().replace('0.4.0-alpha.77','0.4.0-alpha.78').replace('4.92D + bob','5.02D + bob')
               if p.name == 'Alpha68EmiToolsAndSeasonDisplayRegressionTest.java': s=s.replace('renderer.contains("POKÉMON DE TEMPORADA")','renderer.contains("GASHA NORMAL")')
               if p.name == 'Alpha77VisualRegressionTest.java': s=s.replace('model.contains("55")','model.contains("42")')
               p.write_text(s)
-
-          Path('CHANGELOG-0.4.0-alpha.78.md').write_text('# Emipokemon 0.4.0-alpha.78\n\n- Gasha normal: GASHA NORMAL, sin nombre debajo, Eevee decorativo.\n- Pokémon flotantes más grandes.\n- Comandos admin para forzar/limpiar el legendario de Emi.\n- Mejor agarre de las herramientas Emi en tercera persona.\n')
-          Path('GUIA-PRUEBAS-0.4.0-alpha.78.md').write_text('# Guía alpha.78\n\nPrueba GASHA NORMAL, Eevee, legendario Emi, comandos featured emi current/force/clear y las cinco herramientas en F5.\n')
+          Path('CHANGELOG-0.4.0-alpha.78.md').write_text('# Emipokemon 0.4.0-alpha.78\n\n- GASHA NORMAL sin nombre debajo.\n- Pokémon flotantes más grandes.\n- Comandos admin de legendario Emi.\n- Mejor agarre F5 de herramientas Emi.\n')
+          Path('GUIA-PRUEBAS-0.4.0-alpha.78.md').write_text('# Guía alpha.78\n\nPrueba gashas, comandos featured emi current/force/clear y herramientas en F5.\n')
           PY
 
       - name: Preflight alpha.78 changes
@@ -117,9 +120,7 @@ jobs:
 
       - name: Test and build with Java 21
         working-directory: work
-        shell: bash
         run: |
-          set -euxo pipefail
           sed -i 's/\r$//' gradlew
           chmod +x gradlew
           ./gradlew clean test build --no-daemon --stacktrace
@@ -135,9 +136,7 @@ jobs:
           unzip -l "$jar" | grep -q 'com/emipokemon/gacha/banner/FeaturedRotationService.class'
           unzip -l "$jar" | grep -q 'com/emipokemon/command/GachaCommands.class'
           if unzip -l "$jar" | grep -q 'textures/gui/gacha/reveal_sheet.png'; then exit 1; fi
-          cd work
-          zip -qr ../Emipokemon-0.4.0-alpha.78-source.zip . -x 'build/*' '.gradle/*'
-          cd ..
+          cd work && zip -qr ../Emipokemon-0.4.0-alpha.78-source.zip . -x 'build/*' '.gradle/*' && cd ..
           sha256sum "$jar" Emipokemon-0.4.0-alpha.78-source.zip > SHA256SUMS-0.4.0-alpha.78.txt
 
       - uses: actions/upload-artifact@v4
