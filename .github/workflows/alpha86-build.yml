@@ -1,0 +1,100 @@
+name: alpha86-build
+
+on:
+  push:
+    branches: [release/0.4.0-alpha.86]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Restore exact alpha.86 source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 3 --retry-delay 2 \
+            'https://drive.usercontent.google.com/download?id=1db1PrnUPDNyQfDayQVQnleyYcm4a6R-X&export=download&confirm=t' \
+            -o alpha86-source.zip
+          echo '578df54308243491e3a87bcb017600934fd016369afd67e18453fb330e101e93  alpha86-source.zip' | sha256sum -c -
+          mkdir extracted
+          unzip -q alpha86-source.zip -d extracted
+          mv extracted/emipokemon_alpha82_src work
+          grep -q 'mod_version=0.4.0-alpha.86' work/gradle.properties
+          grep -q 'VERSION = "0.4.0-alpha.86"' work/src/main/java/com/emipokemon/Emipokemon.java
+
+      - name: Preflight helmet and chestplate rework
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          test "$(grep -c '\"origin\"' src/main/resources/assets/emipokemon/geo/armor/emi_armor.geo.json)" -ge 80
+          for bone in armorHead helmet_heart armorBody heart_core chest_cords moon_back armorRightLeg armorLeftLeg armorRightBoot armorLeftBoot; do
+            grep -q '"name": "'"$bone"'"' src/main/resources/assets/emipokemon/geo/armor/emi_armor.geo.json
+          done
+          grep -q '29.45' src/main/resources/assets/emipokemon/geo/armor/emi_armor.geo.json
+          grep -q '17.15' src/main/resources/assets/emipokemon/geo/armor/emi_armor.geo.json
+          test "$(sha256sum src/main/resources/assets/emipokemon/geo/armor/emi_armor.geo.json | cut -d' ' -f1)" = '389413a300c4d9057cd7246f4b0bd659d192667a329405a9ff3fed19367cab2b'
+          test "$(sha256sum src/main/resources/assets/emipokemon/textures/models/armor/emi_gecko_armor.png | cut -d' ' -f1)" = 'c3590791b69a95f94963020427eed8a15da3ae04edfba78b94d976c9ec1780d2'
+
+      - name: Compile common and client with Java 21
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sed -i 's/\r$//' gradlew
+          chmod +x gradlew
+          for attempt in 1 2 3; do
+            if ./gradlew --version --no-daemon; then break; fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            sleep $((attempt * 5))
+          done
+          ./gradlew clean build -x test --no-daemon --stacktrace
+
+      - name: Run alpha.86 regression test
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          ./gradlew test --tests com.emipokemon.alpha86.Alpha86HelmetChestReworkRegressionTest --no-daemon --stacktrace
+
+      - name: Verify and package alpha.86
+        shell: bash
+        run: |
+          set -euxo pipefail
+          jar='work/build/libs/emipokemon-0.4.0-alpha.86.jar'
+          test -f "$jar"
+          unzip -p "$jar" fabric.mod.json | grep -q '0.4.0-alpha.86'
+          for entry in \
+            'com/emipokemon/armor/EmiGeoArmorItem.class' \
+            'com/emipokemon/armor/EmiGeoArmorPiece.class' \
+            'com/emipokemon/client/model/EmiArmorGeoModel.class' \
+            'com/emipokemon/client/render/EmiArmorGeoRenderer.class' \
+            'assets/emipokemon/geo/armor/emi_armor.geo.json' \
+            'assets/emipokemon/textures/models/armor/emi_gecko_armor.png'; do
+            unzip -l "$jar" | grep -q "$entry"
+          done
+          cp alpha86-source.zip Emipokemon-0.4.0-alpha.86-source.zip
+          sha256sum "$jar" Emipokemon-0.4.0-alpha.86-source.zip > SHA256SUMS-0.4.0-alpha.86.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Emipokemon-0.4.0-alpha.86-github-build
+          path: |
+            work/build/libs/emipokemon-0.4.0-alpha.86.jar
+            Emipokemon-0.4.0-alpha.86-source.zip
+            SHA256SUMS-0.4.0-alpha.86.txt
+            work/CHANGELOG-0.4.0-alpha.86.md
+            work/GUIA-PRUEBAS-0.4.0-alpha.86.md
+          if-no-files-found: error
