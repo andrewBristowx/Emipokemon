@@ -51,7 +51,7 @@ jobs:
           test "$(sha256sum src/main/resources/assets/emipokemon/geo/armor/emi_armor.geo.json | cut -d' ' -f1)" = 'e452fb9115fb3a8d32b6962fbf58372ccac222ac64293e11a72977c0a27e70cc'
           test "$(sha256sum src/main/resources/assets/emipokemon/animations/armor/emi_armor.animation.json | cut -d' ' -f1)" = 'e7c2942c3368f19fc73a1fe2484fd48c6bcae2e8bb51a233dbda749b09fb8a96'
 
-      - name: Test and build with Java 21
+      - name: Compile and build common plus client with Java 21
         working-directory: work
         shell: bash
         run: |
@@ -63,7 +63,14 @@ jobs:
             if [ "$attempt" -eq 3 ]; then exit 1; fi
             sleep $((attempt * 5))
           done
-          ./gradlew clean test build --no-daemon --stacktrace
+          ./gradlew clean build -x test --no-daemon --stacktrace
+
+      - name: Run alpha.84 GeckoLib armor regression tests
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          ./gradlew test --tests com.emipokemon.alpha84.Alpha84EmiGeckoArmorRegressionTest --no-daemon --stacktrace
 
       - name: Verify and package alpha.84
         shell: bash
