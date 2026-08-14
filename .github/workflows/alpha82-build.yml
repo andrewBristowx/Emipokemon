@@ -43,7 +43,7 @@ jobs:
           curl -fL --retry 3 --retry-delay 2 \
             'https://drive.usercontent.google.com/download?id=1LrwSJhdluXsx8RaO_rl3wqAjD5ZDcomO&export=download&confirm=t' \
             -o alpha82_overlay.zip
-          echo 'ea45d64cb71016a152653b849f62dd5fb3dca21113445c5a03199c37e60731a3  alpha82_overlay.zip' | sha256sum -c -
+          echo '687ff4cc0116652402365812ae8a4ff2f2f0d7c6c7ee0007aae0e40418623c07  alpha82_overlay.zip' | sha256sum -c -
           unzip -qo alpha82_overlay.zip -d work
           grep -q 'mod_version=0.4.0-alpha.82' work/gradle.properties
 
@@ -66,6 +66,9 @@ jobs:
           grep -q 'MOVEMENT_SPEED_BONUS = 0.07D' src/main/java/com/emipokemon/armor/EmiSetBonusService.java
           grep -q 'chance / SHINY_RELATIVE_MULTIPLIER' src/main/java/com/emipokemon/armor/EmiSetBonusService.java
           grep -q 'SHINY_CHANCE_CALCULATION' src/main/java/com/emipokemon/armor/EmiSetBonusService.java
+          grep -q 'Proxy.newProxyInstance' src/main/java/com/emipokemon/armor/EmiSetBonusService.java
+          grep -q 'kotlin.jvm.functions.Function3' src/main/java/com/emipokemon/armor/EmiSetBonusService.java
+          ! grep -q 'event.addModificationFunction(' src/main/java/com/emipokemon/armor/EmiSetBonusService.java
           grep -q 'UNBREAKABLE' src/main/java/com/emipokemon/registry/ModRegistries.java
           grep -q 'TREASURE_GACHA_MACHINE' src/main/java/com/emipokemon/registry/ModRegistries.java
           grep -q 'TREASURE_GACHA_TICKET' src/main/java/com/emipokemon/registry/ModRegistries.java
