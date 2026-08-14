@@ -27,7 +27,7 @@ jobs:
           curl -fL --retry 3 --retry-delay 2 \
             'https://drive.usercontent.google.com/download?id=1TIx3E1o4XvnrhJ6GnIpgnoYfsfrrX1JT&export=download&confirm=t' \
             -o alpha84-source.zip
-          echo '210749e0c0259470d34627673936632df61b0b6204f0e50b8fc6a7b36526a068  alpha84-source.zip' | sha256sum -c -
+          echo 'd01ff439feb25c5eb0e163cd78dd6c21d896dc9b00d3f2c57404911a218c973b  alpha84-source.zip' | sha256sum -c -
           mkdir work
           unzip -q alpha84-source.zip -d work
           grep -q 'mod_version=0.4.0-alpha.84' work/gradle.properties
