@@ -18,22 +18,20 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Download exact alpha.78 source candidate
+      - name: Apply exact alpha.78 patch to alpha.77 base
         shell: bash
         run: |
           set -euxo pipefail
+          find . -type f \( -name '*.java' -o -name '*.json' -o -name '*.md' -o -name '*.properties' -o -name '*.gradle' -o -name '*.yml' -o -name '*.yaml' -o -name '*.txt' \) -not -path './.git/*' -exec sed -i 's/\r$//' {} +
           curl -fL --retry 3 --retry-delay 2 \
-            'https://drive.usercontent.google.com/download?id=1LH1B3MzHoyMuhjds_1XiQ7eWtodPoIE1&export=download&confirm=t' \
-            -o alpha78-source.zip
-          echo '9a9fd489bd9f5c5afb0be7336824693f41ee70ef904c953885f07238ecfc3b75  alpha78-source.zip' | sha256sum -c -
-          mkdir work
-          unzip -q alpha78-source.zip -d work
-          chmod -R u+rwX work
-          grep -q 'mod_version=0.4.0-alpha.78' work/gradle.properties
-          grep -q '0.4.0-alpha.78' work/src/main/java/com/emipokemon/Emipokemon.java
+            'https://drive.usercontent.google.com/download?id=131B5np_e_Ak-e2mmOZoBZ70lJjcPEsL7&export=download&confirm=t' \
+            -o alpha78.patch
+          echo '6597707860f304713d1ab4c95570535c4bc8570572f555451600a89c00770a50  alpha78.patch' | sha256sum -c -
+          patch -p1 --forward < alpha78.patch
+          grep -q 'mod_version=0.4.0-alpha.78' gradle.properties
+          grep -q '0.4.0-alpha.78' src/main/java/com/emipokemon/Emipokemon.java
 
       - name: Preflight alpha.78 changes
-        working-directory: work
         shell: bash
         run: |
           set -euxo pipefail
@@ -54,7 +52,6 @@ jobs:
           test ! -f src/main/resources/assets/emipokemon/textures/gui/gacha/reveal_sheet.png
 
       - name: Test and build with Java 21
-        working-directory: work
         shell: bash
         run: |
           set -euxo pipefail
@@ -62,26 +59,27 @@ jobs:
           chmod +x gradlew
           ./gradlew clean test build --no-daemon --stacktrace
 
-      - name: Verify alpha.78 JAR
+      - name: Verify and package alpha.78
         shell: bash
         run: |
           set -euxo pipefail
-          jar='work/build/libs/emipokemon-0.4.0-alpha.78.jar'
+          jar='build/libs/emipokemon-0.4.0-alpha.78.jar'
           test -f "$jar"
           unzip -p "$jar" fabric.mod.json | grep -q '0.4.0-alpha.78'
           unzip -l "$jar" | grep -q 'com/emipokemon/client/render/SeasonalPokemonWorldRenderer.class'
           unzip -l "$jar" | grep -q 'com/emipokemon/gacha/banner/FeaturedRotationService.class'
           unzip -l "$jar" | grep -q 'com/emipokemon/command/GachaCommands.class'
           if unzip -l "$jar" | grep -q 'textures/gui/gacha/reveal_sheet.png'; then exit 1; fi
-          sha256sum "$jar" alpha78-source.zip > SHA256SUMS-0.4.0-alpha.78.txt
+          zip -qr Emipokemon-0.4.0-alpha.78-source.zip . -x '.git/*' '.gradle/*' 'build/*' 'alpha78.patch' 'Emipokemon-0.4.0-alpha.78-source.zip'
+          sha256sum "$jar" Emipokemon-0.4.0-alpha.78-source.zip > SHA256SUMS-0.4.0-alpha.78.txt
 
       - uses: actions/upload-artifact@v4
         with:
           name: Emipokemon-0.4.0-alpha.78-github-build
           path: |
-            work/build/libs/emipokemon-0.4.0-alpha.78.jar
-            alpha78-source.zip
+            build/libs/emipokemon-0.4.0-alpha.78.jar
+            Emipokemon-0.4.0-alpha.78-source.zip
             SHA256SUMS-0.4.0-alpha.78.txt
-            work/CHANGELOG-0.4.0-alpha.78.md
-            work/GUIA-PRUEBAS-0.4.0-alpha.78.md
+            CHANGELOG-0.4.0-alpha.78.md
+            GUIA-PRUEBAS-0.4.0-alpha.78.md
           if-no-files-found: error
