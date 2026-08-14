@@ -1,0 +1,116 @@
+name: alpha80-build
+
+on:
+  push:
+    branches: [release/0.4.0-alpha.80]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Restore exact successful alpha.79 source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 3 --retry-delay 2 \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            'https://api.github.com/repos/andrewBristowx/Emipokemon/actions/artifacts/9206403797/zip' \
+            -o alpha79-artifact.zip
+          mkdir alpha79-artifact work
+          unzip -q alpha79-artifact.zip -d alpha79-artifact
+          echo '93988dc162531e06671790c23a2a9675092bdd9972a5b79ac49eb28b984742d1  alpha79-artifact/Emipokemon-0.4.0-alpha.79-source.zip' | sha256sum -c -
+          unzip -q alpha79-artifact/Emipokemon-0.4.0-alpha.79-source.zip -d work
+          grep -q 'mod_version=0.4.0-alpha.79' work/gradle.properties
+
+      - name: Apply alpha.80 changes
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cp ci/alpha80_apply.py work/alpha80_apply.py
+          cd work
+          python3 alpha80_apply.py
+          rm alpha80_apply.py
+
+      - name: Preflight alpha.80 regression guards
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          test "$(grep -R '@Test' -h src/test/java | wc -l)" -ge 178
+          grep -q 'mod_version=0.4.0-alpha.80' gradle.properties
+          grep -q '"GASHA NORMAL"' src/client/java/com/emipokemon/client/render/SeasonalPokemonWorldRenderer.java
+          ! grep -q 'POKÉMON DE TEMPORADA' src/client/java/com/emipokemon/client/render/SeasonalPokemonWorldRenderer.java
+          grep -q 'purgeLegacySeasonDisplays' src/main/java/com/emipokemon/gacha/machine/GachaMachineBlockEntity.java
+          grep -q 'EntityType.TEXT_DISPLAY' src/main/java/com/emipokemon/gacha/machine/GachaMachineBlockEntity.java
+          grep -q 'LegacySeasonDisplaysPurged' src/main/java/com/emipokemon/gacha/machine/GachaMachineBlockEntity.java
+          test "$(sha256sum src/main/resources/assets/emipokemon/textures/models/armor/emi_layer_1.png | cut -d' ' -f1)" = '1ff0d1695055e1205ee0ff03d7fcb50f8d8c8c12f15b442acb746fa776b88c5a'
+          test "$(sha256sum src/main/resources/assets/emipokemon/textures/models/armor/emi_layer_2.png | cut -d' ' -f1)" = '89bff9190c84c82d00505d884e8dc52cbd0911d24d24280baffbac35f7f86255'
+          test "$(sha256sum src/main/resources/assets/emipokemon/textures/gui/gacha/standard_gacha.png | cut -d' ' -f1)" = '694aadcaca9a8dcaace9c26a9e43cf41e056203855cd380670d0b7c208f4d98d'
+          test "$(sha256sum src/main/resources/assets/emipokemon/textures/gui/gacha/emi_gacha.png | cut -d' ' -f1)" = '4c61d6a00e324a82d060b8c7b9a3abe40daa437fda8d8efb5a4eaf45b973e216'
+          test "$(sha256sum src/main/resources/assets/emipokemon/textures/block/standard_gacha_machine.png | cut -d' ' -f1)" = '42d060134c7809f2617bcf1aa7a06f02750908eb616fcbbfb3b837dbf98e30cd'
+          test "$(sha256sum src/main/resources/assets/emipokemon/textures/block/emi_gacha_machine.png | cut -d' ' -f1)" = '4d0d76caca51f7d167d3197030d7074e9ac2b7e1ade015c5a01c462ef3e4aea0'
+          test ! -f src/main/resources/assets/emipokemon/textures/gui/gacha/reveal_sheet.png
+
+      - name: Test and build common server and client with Java 21
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sed -i 's/\r$//' gradlew
+          chmod +x gradlew
+          for attempt in 1 2 3; do
+            if ./gradlew --version --no-daemon; then break; fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            sleep $((attempt * 5))
+          done
+          ./gradlew clean test build --no-daemon --stacktrace
+
+      - name: Verify and package alpha.80
+        shell: bash
+        run: |
+          set -euxo pipefail
+          jar='work/build/libs/emipokemon-0.4.0-alpha.80.jar'
+          test -f "$jar"
+          unzip -p "$jar" fabric.mod.json | grep -q '0.4.0-alpha.80'
+          for entry in \
+            'com/emipokemon/gacha/machine/GachaMachineBlockEntity.class' \
+            'com/emipokemon/armor/EmiArmorMaterial.class' \
+            'com/emipokemon/client/render/SeasonalPokemonWorldRenderer.class' \
+            'assets/emipokemon/textures/models/armor/emi_layer_1.png' \
+            'assets/emipokemon/textures/models/armor/emi_layer_2.png'; do
+            unzip -l "$jar" | grep -q "$entry"
+          done
+          test "$(unzip -p "$jar" assets/emipokemon/textures/models/armor/emi_layer_1.png | sha256sum | cut -d' ' -f1)" = '1ff0d1695055e1205ee0ff03d7fcb50f8d8c8c12f15b442acb746fa776b88c5a'
+          test "$(unzip -p "$jar" assets/emipokemon/textures/models/armor/emi_layer_2.png | sha256sum | cut -d' ' -f1)" = '89bff9190c84c82d00505d884e8dc52cbd0911d24d24280baffbac35f7f86255'
+          test "$(unzip -p "$jar" assets/emipokemon/textures/gui/gacha/standard_gacha.png | sha256sum | cut -d' ' -f1)" = '694aadcaca9a8dcaace9c26a9e43cf41e056203855cd380670d0b7c208f4d98d'
+          test "$(unzip -p "$jar" assets/emipokemon/textures/gui/gacha/emi_gacha.png | sha256sum | cut -d' ' -f1)" = '4c61d6a00e324a82d060b8c7b9a3abe40daa437fda8d8efb5a4eaf45b973e216'
+          if unzip -l "$jar" | grep -q 'textures/gui/gacha/reveal_sheet.png'; then exit 1; fi
+          cd work
+          zip -qr ../Emipokemon-0.4.0-alpha.80-source.zip . -x 'build/*' '.gradle/*'
+          cd ..
+          sha256sum "$jar" Emipokemon-0.4.0-alpha.80-source.zip > SHA256SUMS-0.4.0-alpha.80.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Emipokemon-0.4.0-alpha.80-github-build
+          path: |
+            work/build/libs/emipokemon-0.4.0-alpha.80.jar
+            Emipokemon-0.4.0-alpha.80-source.zip
+            SHA256SUMS-0.4.0-alpha.80.txt
+            work/CHANGELOG-0.4.0-alpha.80.md
+            work/GUIA-PRUEBAS-0.4.0-alpha.80.md
+          if-no-files-found: error
