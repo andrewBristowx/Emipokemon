@@ -39,7 +39,7 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          test "$(grep -c '"'"'origin'"'"' src/main/resources/assets/emipokemon/geo/armor/emi_armor.geo.json)" -ge 60
+          test "$(grep -c '"origin"' src/main/resources/assets/emipokemon/geo/armor/emi_armor.geo.json)" -ge 60
           for bone in armorHead helmet_heart armorBody heart_core chest_cords moon_back armorRightArm armorLeftArm armorRightLeg armorLeftLeg armorRightBoot armorLeftBoot; do
             grep -q '"name": "'"$bone"'"' src/main/resources/assets/emipokemon/geo/armor/emi_armor.geo.json
           done
