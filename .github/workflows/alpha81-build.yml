@@ -101,7 +101,7 @@ jobs:
           grep -q '4.52D + bob' "$renderer"
           grep -q 'GachaMachineTextDisplayService.reconcile' src/main/java/com/emipokemon/gacha/machine/GachaMachineBlockEntity.java
           grep -q 'piston-meta.mojang.com' ci/alpha81_vanilla_armor.py
-          grep -q 'resources.download.minecraft.net' ci/alpha81_vanilla_armor.py
+          grep -q 'downloads.*client' ci/alpha81_vanilla_armor.py
           test "$(sha256sum src/main/resources/assets/emipokemon/textures/gui/gacha/standard_gacha.png | cut -d' ' -f1)" = '694aadcaca9a8dcaace9c26a9e43cf41e056203855cd380670d0b7c208f4d98d'
           test "$(sha256sum src/main/resources/assets/emipokemon/textures/gui/gacha/emi_gacha.png | cut -d' ' -f1)" = '4c61d6a00e324a82d060b8c7b9a3abe40daa437fda8d8efb5a4eaf45b973e216'
           test "$(sha256sum src/main/resources/assets/emipokemon/textures/block/standard_gacha_machine.png | cut -d' ' -f1)" = '42d060134c7809f2617bcf1aa7a06f02750908eb616fcbbfb3b837dbf98e30cd'
