@@ -1,0 +1,93 @@
+name: alpha87-build
+
+on:
+  push:
+    branches: [release/0.4.0-alpha.87]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Restore exact alpha.86 source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 3 --retry-delay 2 \
+            'https://drive.usercontent.google.com/download?id=1db1PrnUPDNyQfDayQVQnleyYcm4a6R-X&export=download&confirm=t' \
+            -o alpha86-source.zip
+          echo '578df54308243491e3a87bcb017600934fd016369afd67e18453fb330e101e93  alpha86-source.zip' | sha256sum -c -
+          mkdir extracted
+          unzip -q alpha86-source.zip -d extracted
+          mv extracted/emipokemon_alpha82_src work
+
+      - name: Apply alpha.87 helmet and heart patch
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 "$GITHUB_WORKSPACE/ci/alpha87_patch.py"
+          grep -q 'mod_version=0.4.0-alpha.87' gradle.properties
+          grep -q 'VERSION = "0.4.0-alpha.87"' src/main/java/com/emipokemon/Emipokemon.java
+          test "$(sha256sum src/main/resources/assets/emipokemon/geo/armor/emi_armor.geo.json | cut -d' ' -f1)" = 'f86391bc6eb2bd5f3f0071ace734f380d61a66de2d4fbf133ce635bb49d70ca0'
+          test "$(sha256sum src/main/resources/assets/emipokemon/textures/models/armor/emi_gecko_armor.png | cut -d' ' -f1)" = 'c3590791b69a95f94963020427eed8a15da3ae04edfba78b94d976c9ec1780d2'
+
+      - name: Compile common and client with Java 21
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sed -i 's/\r$//' gradlew
+          chmod +x gradlew
+          for attempt in 1 2 3; do
+            if ./gradlew --version --no-daemon; then break; fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            sleep $((attempt * 5))
+          done
+          ./gradlew clean build -x test --no-daemon --stacktrace
+
+      - name: Run alpha.87 regression test
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          ./gradlew test --tests com.emipokemon.alpha87.Alpha87EmiArmorFlatHeartRegressionTest --no-daemon --stacktrace
+
+      - name: Verify and package alpha.87
+        shell: bash
+        run: |
+          set -euxo pipefail
+          jar='work/build/libs/emipokemon-0.4.0-alpha.87.jar'
+          test -f "$jar"
+          unzip -p "$jar" fabric.mod.json | grep -q '0.4.0-alpha.87'
+          for entry in \
+            'com/emipokemon/armor/EmiGeoArmorItem.class' \
+            'com/emipokemon/client/render/EmiArmorGeoRenderer.class' \
+            'assets/emipokemon/geo/armor/emi_armor.geo.json' \
+            'assets/emipokemon/textures/models/armor/emi_gecko_armor.png'; do
+            unzip -l "$jar" | grep -q "$entry"
+          done
+          (cd work && zip -qr ../Emipokemon-0.4.0-alpha.87-source.zip .)
+          sha256sum "$jar" Emipokemon-0.4.0-alpha.87-source.zip > SHA256SUMS-0.4.0-alpha.87.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Emipokemon-0.4.0-alpha.87-github-build
+          path: |
+            work/build/libs/emipokemon-0.4.0-alpha.87.jar
+            Emipokemon-0.4.0-alpha.87-source.zip
+            SHA256SUMS-0.4.0-alpha.87.txt
+            work/CHANGELOG-0.4.0-alpha.87.md
+            work/GUIA-PRUEBAS-0.4.0-alpha.87.md
+          if-no-files-found: error
