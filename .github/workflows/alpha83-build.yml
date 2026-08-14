@@ -43,7 +43,7 @@ jobs:
           curl -fL --retry 3 --retry-delay 2 \
             'https://drive.usercontent.google.com/download?id=1QYVspo6jIqPVRO5xNrYgTKCJXHTb86Qf&export=download&confirm=t' \
             -o alpha83_overlay.zip
-          echo '44ad92d395172b0469aaf85e2bd0fc59f8cef560b332f3d47b203f2ce7e88e91  alpha83_overlay.zip' | sha256sum -c -
+          echo 'ad69d8900ae9c2ad0e1cde73bdb1b69a6dd9c75a9f2c254fa6c5d8070e35418f  alpha83_overlay.zip' | sha256sum -c -
           unzip -qo alpha83_overlay.zip -d work
           grep -q 'mod_version=0.4.0-alpha.83' work/gradle.properties
 
