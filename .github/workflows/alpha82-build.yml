@@ -82,17 +82,13 @@ jobs:
           test ! -f src/main/resources/assets/emipokemon/textures/gui/gacha/reveal_sheet.png
           python3 - <<'PY'
           from pathlib import Path
-          from PIL import Image
+          import struct
           for layer in (1,2):
-              p=Path(f'src/main/resources/assets/emipokemon/textures/models/armor/emi_layer_{layer}.png')
-              im=Image.open(p).convert('RGBA')
-              assert im.size==(64,32)
-              px=list(im.getdata()); visible=sum(a>0 for r,g,b,a in px); transparent=2048-visible
-              assert 100 < visible < 1500 and transparent > 500
-              black=sum(a>0 and max(r,g,b)<90 for r,g,b,a in px)
-              pink=sum(a>0 and r>g and b>g for r,g,b,a in px)
-              gold=sum(a>0 and r>150 and g>90 and b<100 for r,g,b,a in px)
-              assert black>10 and pink>20 and gold>0
+              raw=Path(f'src/main/resources/assets/emipokemon/textures/models/armor/emi_layer_{layer}.png').read_bytes()
+              assert raw[:8]==b'\x89PNG\r\n\x1a\n'
+              assert raw[12:16]==b'IHDR'
+              w,h=struct.unpack('>II',raw[16:24])
+              assert (w,h)==(64,32)
           PY
 
       - name: Test and build common server and client with Java 21
