@@ -1,0 +1,161 @@
+name: alpha81-build
+
+on:
+  push:
+    branches: [release/0.4.0-alpha.81]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Restore exact successful alpha.80 source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 3 --retry-delay 2 \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            'https://api.github.com/repos/andrewBristowx/Emipokemon/actions/artifacts/9207595920/zip' \
+            -o alpha80-artifact.zip
+          mkdir alpha80-artifact work
+          unzip -q alpha80-artifact.zip -d alpha80-artifact
+          echo '80cc66ffdaefda8f756c2963792c889044c03833145f32459745f79608358bfb  alpha80-artifact/Emipokemon-0.4.0-alpha.80-source.zip' | sha256sum -c -
+          unzip -q alpha80-artifact/Emipokemon-0.4.0-alpha.80-source.zip -d work
+          grep -q 'mod_version=0.4.0-alpha.80' work/gradle.properties
+
+      - name: Apply alpha.81 source migration
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cp ci/alpha81_apply.py work/ci/alpha81_apply.py
+          cp ci/alpha81_vanilla_armor.py work/ci/alpha81_vanilla_armor.py
+          cd work
+          python3 ci/alpha81_apply.py
+          grep -q 'mod_version=0.4.0-alpha.81' gradle.properties
+
+      - name: Generate Emi armor from official Minecraft 1.21.1 diamond UVs
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 ci/alpha81_vanilla_armor.py
+          python3 - <<'PY'
+          import struct,zlib
+          from pathlib import Path
+          def decode(path):
+              raw=Path(path).read_bytes(); pos=8; w=h=ctype=None; data=b''
+              while pos<len(raw):
+                  n=struct.unpack('>I',raw[pos:pos+4])[0]; typ=raw[pos+4:pos+8]; dat=raw[pos+8:pos+8+n]; pos+=12+n
+                  if typ==b'IHDR': w,h,depth,ctype,_,_,_=struct.unpack('>IIBBBBB',dat)
+                  elif typ==b'IDAT': data+=dat
+                  elif typ==b'IEND': break
+              bpp=4 if ctype==6 else 3; d=zlib.decompress(data); stride=w*bpp; prev=bytearray(stride); off=0; visible=transparent=0
+              def paeth(a,b,c):
+                  p=a+b-c; pa=abs(p-a); pb=abs(p-b); pc=abs(p-c); return a if pa<=pb and pa<=pc else b if pb<=pc else c
+              for _ in range(h):
+                  ft=d[off]; off+=1; src=bytearray(d[off:off+stride]); off+=stride; row=bytearray(stride)
+                  for i,x in enumerate(src):
+                      a=row[i-bpp] if i>=bpp else 0; b=prev[i]; c=prev[i-bpp] if i>=bpp else 0
+                      row[i]=(x + (0 if ft==0 else a if ft==1 else b if ft==2 else (a+b)//2 if ft==3 else paeth(a,b,c))) & 255
+                  for i in range(0,stride,bpp):
+                      alpha=row[i+3] if bpp==4 else 255
+                      if alpha: visible+=1
+                      else: transparent+=1
+                  prev=row
+              return w,h,visible,transparent
+          for layer in (1,2):
+              p=f'src/main/resources/assets/emipokemon/textures/models/armor/emi_layer_{layer}.png'
+              w,h,v,t=decode(p); print(p,w,h,v,t)
+              assert (w,h)==(64,32) and t>500 and 100<v<1500
+          PY
+
+      - name: Preflight alpha.81 regression guards
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          test "$(grep -R '@Test' -h src/test/java | wc -l)" -ge 182
+          grep -q 'mod_version=0.4.0-alpha.81' gradle.properties
+          labels='src/main/java/com/emipokemon/gacha/machine/GachaMachineTextDisplayService.java'
+          renderer='src/client/java/com/emipokemon/client/render/SeasonalPokemonWorldRenderer.java'
+          grep -q 'EntityType.TEXT_DISPLAY.create(world)' "$labels"
+          grep -q 'GASHA NORMAL' "$labels"
+          grep -q 'LEGENDARIO DE EMI' "$labels"
+          grep -q 'emipokemon:gacha-label:' "$labels"
+          grep -q 'emipokemon:hologram:' "$labels"
+          ! grep -q 'drawTextLine' "$renderer"
+          grep -q '4.52D + bob' "$renderer"
+          grep -q 'GachaMachineTextDisplayService.reconcile' src/main/java/com/emipokemon/gacha/machine/GachaMachineBlockEntity.java
+          grep -q 'piston-meta.mojang.com' ci/alpha81_vanilla_armor.py
+          grep -q 'resources.download.minecraft.net' ci/alpha81_vanilla_armor.py
+          test "$(sha256sum src/main/resources/assets/emipokemon/textures/gui/gacha/standard_gacha.png | cut -d' ' -f1)" = '694aadcaca9a8dcaace9c26a9e43cf41e056203855cd380670d0b7c208f4d98d'
+          test "$(sha256sum src/main/resources/assets/emipokemon/textures/gui/gacha/emi_gacha.png | cut -d' ' -f1)" = '4c61d6a00e324a82d060b8c7b9a3abe40daa437fda8d8efb5a4eaf45b973e216'
+          test "$(sha256sum src/main/resources/assets/emipokemon/textures/block/standard_gacha_machine.png | cut -d' ' -f1)" = '42d060134c7809f2617bcf1aa7a06f02750908eb616fcbbfb3b837dbf98e30cd'
+          test "$(sha256sum src/main/resources/assets/emipokemon/textures/block/emi_gacha_machine.png | cut -d' ' -f1)" = '4d0d76caca51f7d167d3197030d7074e9ac2b7e1ade015c5a01c462ef3e4aea0'
+          test ! -f src/main/resources/assets/emipokemon/textures/gui/gacha/reveal_sheet.png
+
+      - name: Test and build common server and client with Java 21
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sed -i 's/\r$//' gradlew
+          chmod +x gradlew
+          for attempt in 1 2 3; do
+            if ./gradlew --version --no-daemon; then break; fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            sleep $((attempt * 5))
+          done
+          ./gradlew clean test build --no-daemon --stacktrace
+
+      - name: Verify and package alpha.81
+        shell: bash
+        run: |
+          set -euxo pipefail
+          jar='work/build/libs/emipokemon-0.4.0-alpha.81.jar'
+          test -f "$jar"
+          unzip -p "$jar" fabric.mod.json | grep -q '0.4.0-alpha.81'
+          for entry in \
+            'com/emipokemon/gacha/machine/GachaMachineTextDisplayService.class' \
+            'com/emipokemon/gacha/machine/GachaMachineBlockEntity.class' \
+            'com/emipokemon/armor/EmiArmorMaterial.class' \
+            'com/emipokemon/client/render/SeasonalPokemonWorldRenderer.class' \
+            'assets/emipokemon/textures/models/armor/emi_layer_1.png' \
+            'assets/emipokemon/textures/models/armor/emi_layer_2.png' \
+            'assets/emipokemon/textures/item/emi_helmet.png' \
+            'assets/emipokemon/textures/item/emi_chestplate.png' \
+            'assets/emipokemon/textures/item/emi_leggings.png' \
+            'assets/emipokemon/textures/item/emi_boots.png'; do
+            unzip -l "$jar" | grep -q "$entry"
+          done
+          test "$(unzip -p "$jar" assets/emipokemon/textures/gui/gacha/standard_gacha.png | sha256sum | cut -d' ' -f1)" = '694aadcaca9a8dcaace9c26a9e43cf41e056203855cd380670d0b7c208f4d98d'
+          test "$(unzip -p "$jar" assets/emipokemon/textures/gui/gacha/emi_gacha.png | sha256sum | cut -d' ' -f1)" = '4c61d6a00e324a82d060b8c7b9a3abe40daa437fda8d8efb5a4eaf45b973e216'
+          if unzip -l "$jar" | grep -q 'textures/gui/gacha/reveal_sheet.png'; then exit 1; fi
+          cd work
+          zip -qr ../Emipokemon-0.4.0-alpha.81-source.zip . -x 'build/*' '.gradle/*'
+          cd ..
+          sha256sum "$jar" Emipokemon-0.4.0-alpha.81-source.zip > SHA256SUMS-0.4.0-alpha.81.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Emipokemon-0.4.0-alpha.81-github-build
+          path: |
+            work/build/libs/emipokemon-0.4.0-alpha.81.jar
+            Emipokemon-0.4.0-alpha.81-source.zip
+            SHA256SUMS-0.4.0-alpha.81.txt
+            work/CHANGELOG-0.4.0-alpha.81.md
+            work/GUIA-PRUEBAS-0.4.0-alpha.81.md
+          if-no-files-found: error
