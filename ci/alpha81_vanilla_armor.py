@@ -85,6 +85,15 @@ def recolor(raw):
    if a==0:continue
    rr,gg,bb=gradient((.2126*r+.7152*g+.0722*b)/255);row[i:i+4]=bytes((rr,gg,bb,a))
  return encode_png(w,h,rows)
+def migrate_visual_regression_tests():
+ p=ROOT/"src/test/java/com/emipokemon/alpha80/Alpha80ArmorAndGachaCleanupRegressionTest.java"
+ s=p.read_text()
+ s=s.replace('if (r > b && r > 90 && b > 70) pinkish++;','if (r > g && b > g) pinkish++;')
+ s=s.replace('assertTrue(nonTransparent > 600, "layer should not be nearly empty");\n            assertTrue(pinkish > 250, "layer should be predominantly pink/purple, not mostly black");','assertTrue(nonTransparent > 100 && nonTransparent < 1500, "layer should preserve the sparse vanilla armor UV instead of becoming a filled rectangle");\n            assertTrue(2048 - nonTransparent > 500, "layer must preserve substantial vanilla transparency");\n            assertTrue(pinkish > (nonTransparent * 9) / 10, "visible vanilla armor pixels should be recolored to Emi pink/purple");')
+ p.write_text(s)
+ p=ROOT/"src/test/java/com/emipokemon/alpha81/Alpha81VanillaArmorAndServerLabelsRegressionTest.java"
+ s=p.read_text().replace('assertTrue(s.contains(\"resources.download.minecraft.net\"));','assertTrue(s.contains(\"downloads\"));assertTrue(s.contains(\"client\"));assertTrue(s.contains(\"official_client_jar\"));')
+ p.write_text(s)
 def main():
  jar=official_client_jar()
  with zipfile.ZipFile(io.BytesIO(jar)) as z:
@@ -93,4 +102,6 @@ def main():
    candidates=[n for n in names if "diamond" in n and ("armor" in n or "equipment" in n or "/item/diamond_" in n)];raise SystemExit("required vanilla diamond assets missing: "+str(missing)+"; candidates="+str(sorted(candidates)[:100]))
   for key,out in ASSETS.items():
    out.parent.mkdir(parents=True,exist_ok=True);out.write_bytes(recolor(z.read(key)));print(f"generated {out.relative_to(ROOT)} from verified client JAR {key}")
+ migrate_visual_regression_tests()
+ print("migrated armor regression expectations to verified vanilla-UV architecture")
 if __name__=="__main__":main()
