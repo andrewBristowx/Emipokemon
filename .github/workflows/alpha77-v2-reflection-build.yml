@@ -14,14 +14,14 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - name: Reconstruct verified alpha.76 and alpha.77 v2
+      - name: Reconstruct verified alpha.76 and alpha.77 v3
         run: |
           set -euxo pipefail
           curl -fL --retry 3 'https://drive.usercontent.google.com/download?id=1M87NgfFMAdU7ufg7qCaQGUF6pbl3tHYG&export=download&confirm=t' -o alpha76-source.zip
           echo 'dabac510ee74d3f1fae384d8dd80eef147a17e6d4cfc731456e769d50ad39314  alpha76-source.zip' | sha256sum -c -
           mkdir work && unzip -q alpha76-source.zip -d work
-          curl -fL --retry 3 'https://drive.usercontent.google.com/download?id=1dIbktgljzHKO6RWqPswxkVe-eObFIC40&export=download&confirm=t' -o alpha77-overlay.zip
-          echo 'a5b00bac3c65dbe8ba10434941a083eabcf34f06317b3c8afc8c1f5e931d76e9  alpha77-overlay.zip' | sha256sum -c -
+          curl -fL --retry 3 'https://drive.usercontent.google.com/download?id=1ru2FDtoDAATDO_Go-wFrI_gI5JVrwOsU&export=download&confirm=t' -o alpha77-overlay.zip
+          echo '4281aba55006ee5ae9646a08efa3e436b2f9ea19dbf827526f4caf45fcf37db0  alpha77-overlay.zip' | sha256sum -c -
           unzip -qo alpha77-overlay.zip -d work
           grep -q 'mod_version=0.4.0-alpha.77' work/gradle.properties
       - name: Preflight
@@ -60,7 +60,7 @@ jobs:
           sha256sum "$jar" Emipokemon-0.4.0-alpha.77-source.zip > SHA256SUMS-0.4.0-alpha.77.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: Emipokemon-0.4.0-alpha.77-v2-build
+          name: Emipokemon-0.4.0-alpha.77-v3-build
           path: |
             work/build/libs/emipokemon-0.4.0-alpha.77.jar
             Emipokemon-0.4.0-alpha.77-source.zip
