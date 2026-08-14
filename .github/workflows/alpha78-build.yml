@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   build:
@@ -18,11 +19,30 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Apply alpha.78 changes to alpha.77 base
+      - name: Restore exact successful alpha.77 source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 3 --retry-delay 2 \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            'https://api.github.com/repos/andrewBristowx/Emipokemon/actions/artifacts/9203335849/zip' \
+            -o alpha77-artifact.zip
+          mkdir alpha77-artifact work
+          unzip -q alpha77-artifact.zip -d alpha77-artifact
+          echo 'b69fbb7d5a2e9325142380d01eb8e0366bf15c2d0013fb16db32d957fb22bcf4  alpha77-artifact/Emipokemon-0.4.0-alpha.77-source.zip' | sha256sum -c -
+          unzip -q alpha77-artifact/Emipokemon-0.4.0-alpha.77-source.zip -d work
+          chmod -R u+rwX work
+          grep -q 'mod_version=0.4.0-alpha.77' work/gradle.properties
+
+      - name: Apply alpha.78 changes
+        working-directory: work
         shell: bash
         run: |
           set -euxo pipefail
-          find . -type f \( -name '*.java' -o -name '*.json' -o -name '*.md' -o -name '*.properties' -o -name '*.gradle' \) -not -path './.git/*' -exec sed -i 's/\r$//' {} +
+          find . -type f \( -name '*.java' -o -name '*.json' -o -name '*.md' -o -name '*.properties' -o -name '*.gradle' \) -exec sed -i 's/\r$//' {} +
           python3 - <<'PY'
           from pathlib import Path
 
@@ -47,7 +67,7 @@ jobs:
           if old not in t: raise SystemExit('rotation selection block not found')
           t=t.replace(old,new)
           marker='''    /** The complete implemented LEGENDARY pool, sorted for stable admin/debug output. */\n    public synchronized List<PokemonCatalogEntry> legendaryPool() {'''
-          methods='''    /** Forces the Emi themed gacha to display a specific implemented legendary until cleared. */\n    public synchronized PokemonCatalogEntry forceEmiLegendary(String speciesId) {\n        PokemonCatalogEntry entry = catalog.get(speciesId);\n        if (entry == null || entry.tier() != GachaTier.LEGENDARY) return null;\n        ensureLoaded();\n        if (state == null) state = new RotationState();\n        state.forcedSpeciesId = entry.speciesId();\n        saveState();\n        return entry;\n    }\n\n    public synchronized PokemonCatalogEntry clearForcedEmiLegendary() {\n        ensureLoaded();\n        if (state != null) { state.forcedSpeciesId = ""; saveState(); }\n        return currentEmiLegendary(System.currentTimeMillis());\n    }\n\n    public synchronized PokemonCatalogEntry forcedEmiLegendary() {\n        ensureLoaded();\n        if (state == null || state.forcedSpeciesId == null || state.forcedSpeciesId.isBlank()) return null;\n        PokemonCatalogEntry entry = catalog.get(state.forcedSpeciesId);\n        return entry != null && entry.tier() == GachaTier.LEGENDARY ? entry : null;\n    }\n\n    /** The complete implemented LEGENDARY pool, sorted for stable admin/debug output. */\n    public synchronized List<PokemonCatalogEntry> legendaryPool() {'''
+          methods='''    public synchronized PokemonCatalogEntry forceEmiLegendary(String speciesId) {\n        PokemonCatalogEntry entry = catalog.get(speciesId);\n        if (entry == null || entry.tier() != GachaTier.LEGENDARY) return null;\n        ensureLoaded();\n        if (state == null) state = new RotationState();\n        state.forcedSpeciesId = entry.speciesId();\n        saveState();\n        return entry;\n    }\n\n    public synchronized PokemonCatalogEntry clearForcedEmiLegendary() {\n        ensureLoaded();\n        if (state != null) { state.forcedSpeciesId = ""; saveState(); }\n        return currentEmiLegendary(System.currentTimeMillis());\n    }\n\n    public synchronized PokemonCatalogEntry forcedEmiLegendary() {\n        ensureLoaded();\n        if (state == null || state.forcedSpeciesId == null || state.forcedSpeciesId.isBlank()) return null;\n        PokemonCatalogEntry entry = catalog.get(state.forcedSpeciesId);\n        return entry != null && entry.tier() == GachaTier.LEGENDARY ? entry : null;\n    }\n\n    /** The complete implemented LEGENDARY pool, sorted for stable admin/debug output. */\n    public synchronized List<PokemonCatalogEntry> legendaryPool() {'''
           if marker not in t: raise SystemExit('legendaryPool marker not found')
           t=t.replace(marker,methods).replace('String speciesId = "";\n        long standardBucket', 'String speciesId = "";\n        String forcedSpeciesId = "";\n        long standardBucket')
           p.write_text(t)
@@ -59,8 +79,7 @@ jobs:
           anchor='''                        .then(literal("reload")\n                                .requires(source -> source.hasPermissionLevel(4))'''
           featured='''                        .then(literal("featured")\n                                .requires(source -> source.hasPermissionLevel(4))\n                                .then(literal("emi")\n                                        .then(literal("current").executes(context -> {\n                                            PokemonCatalogEntry forced = featuredRotation.forcedEmiLegendary();\n                                            PokemonCatalogEntry current = featuredRotation.currentEmiLegendary();\n                                            String suffix = forced != null ? " | forzado=" + forced.displayName() : "";\n                                            context.getSource().sendFeedback(() -> Text.literal(current == null ? "No hay legendario actual de Emi todavía." : "Legendario actual de Emi: " + current.displayName() + suffix), false);\n                                            return current == null ? 0 : 1;\n                                        }))\n                                        .then(literal("force").then(argument("pokemon", StringArgumentType.word()).executes(context -> {\n                                            String id = StringArgumentType.getString(context, "pokemon");\n                                            PokemonCatalogEntry entry = featuredRotation.forceEmiLegendary(id);\n                                            if (entry == null) { context.getSource().sendError(Text.literal("Debes indicar un Pokemon legendario válido del catálogo: " + id)); return 0; }\n                                            context.getSource().sendFeedback(() -> Text.literal("Legendario de Emi forzado a: " + entry.displayName() + " (los gashas se actualizarán en pocos segundos)."), true);\n                                            return 1;\n                                        })))\n                                        .then(literal("clear").executes(context -> {\n                                            PokemonCatalogEntry current = featuredRotation.clearForcedEmiLegendary();\n                                            context.getSource().sendFeedback(() -> Text.literal(current == null ? "Se limpió el forzado del legendario de Emi." : "Se limpió el forzado del legendario de Emi. Ahora rota: " + current.displayName()), true);\n                                            return 1;\n                                        }))))\n'''
           if anchor not in t: raise SystemExit('gacha reload anchor not found')
-          t=t.replace(anchor,featured+anchor)
-          p.write_text(t)
+          p.write_text(t.replace(anchor,featured+anchor))
 
           old_right='''"thirdperson_righthand": {\n      "rotation": [\n        0,\n        -90,\n        55\n      ],\n      "translation": [\n        0,\n        4,\n        0.5\n      ],\n      "scale": [\n        0.72,\n        0.72,\n        0.72\n      ]\n    }'''
           new_right='''"thirdperson_righthand": {\n      "rotation": [0, -90, 42],\n      "translation": [0, 2.75, 0],\n      "scale": [0.56, 0.56, 0.56]\n    }'''
@@ -77,11 +96,12 @@ jobs:
               if p.name == 'Alpha77VisualRegressionTest.java': s=s.replace('model.contains("55")','model.contains("42")')
               p.write_text(s)
 
-          Path('CHANGELOG-0.4.0-alpha.78.md').write_text('''# Emipokemon 0.4.0-alpha.78\n\n- Gasha normal: texto GASHA NORMAL, sin nombre debajo y Eevee como mascota visual.\n- Pokémon flotantes más grandes y altos.\n- Comandos admin para consultar, forzar y limpiar el legendario de Emi.\n- Ajuste de agarre de las cinco herramientas Emi en tercera persona.\n- Primera persona, gameplay y arte aprobado del gasha preservados.\n''')
-          Path('GUIA-PRUEBAS-0.4.0-alpha.78.md').write_text('''# Guía de pruebas — Emipokemon 0.4.0-alpha.78\n\n1. Instala el mismo JAR alpha.78 en servidor y clientes.\n2. Normal: GASHA NORMAL, sin nombre debajo, Eevee visible y más grande.\n3. Emi: LEGENDARIO DE EMI y nombre del legendario visible.\n4. Prueba `/emipokemon gacha featured emi current`, `force rayquaza` y `clear`.\n5. Revisa las cinco herramientas en primera y tercera persona.\n6. Revalida 3x3, tala, azada y el layout x1/x10.\n''')
+          Path('CHANGELOG-0.4.0-alpha.78.md').write_text('# Emipokemon 0.4.0-alpha.78\n\n- Gasha normal: GASHA NORMAL, sin nombre debajo, Eevee decorativo.\n- Pokémon flotantes más grandes.\n- Comandos admin para forzar/limpiar el legendario de Emi.\n- Mejor agarre de las herramientas Emi en tercera persona.\n')
+          Path('GUIA-PRUEBAS-0.4.0-alpha.78.md').write_text('# Guía alpha.78\n\nPrueba GASHA NORMAL, Eevee, legendario Emi, comandos featured emi current/force/clear y las cinco herramientas en F5.\n')
           PY
 
       - name: Preflight alpha.78 changes
+        working-directory: work
         shell: bash
         run: |
           set -euxo pipefail
@@ -96,6 +116,7 @@ jobs:
           test ! -f src/main/resources/assets/emipokemon/textures/gui/gacha/reveal_sheet.png
 
       - name: Test and build with Java 21
+        working-directory: work
         shell: bash
         run: |
           set -euxo pipefail
@@ -107,23 +128,25 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          jar='build/libs/emipokemon-0.4.0-alpha.78.jar'
+          jar='work/build/libs/emipokemon-0.4.0-alpha.78.jar'
           test -f "$jar"
           unzip -p "$jar" fabric.mod.json | grep -q '0.4.0-alpha.78'
           unzip -l "$jar" | grep -q 'com/emipokemon/client/render/SeasonalPokemonWorldRenderer.class'
           unzip -l "$jar" | grep -q 'com/emipokemon/gacha/banner/FeaturedRotationService.class'
           unzip -l "$jar" | grep -q 'com/emipokemon/command/GachaCommands.class'
           if unzip -l "$jar" | grep -q 'textures/gui/gacha/reveal_sheet.png'; then exit 1; fi
-          zip -qr Emipokemon-0.4.0-alpha.78-source.zip . -x '.git/*' '.gradle/*' 'build/*' 'Emipokemon-0.4.0-alpha.78-source.zip'
+          cd work
+          zip -qr ../Emipokemon-0.4.0-alpha.78-source.zip . -x 'build/*' '.gradle/*'
+          cd ..
           sha256sum "$jar" Emipokemon-0.4.0-alpha.78-source.zip > SHA256SUMS-0.4.0-alpha.78.txt
 
       - uses: actions/upload-artifact@v4
         with:
           name: Emipokemon-0.4.0-alpha.78-github-build
           path: |
-            build/libs/emipokemon-0.4.0-alpha.78.jar
+            work/build/libs/emipokemon-0.4.0-alpha.78.jar
             Emipokemon-0.4.0-alpha.78-source.zip
             SHA256SUMS-0.4.0-alpha.78.txt
-            CHANGELOG-0.4.0-alpha.78.md
-            GUIA-PRUEBAS-0.4.0-alpha.78.md
+            work/CHANGELOG-0.4.0-alpha.78.md
+            work/GUIA-PRUEBAS-0.4.0-alpha.78.md
           if-no-files-found: error
