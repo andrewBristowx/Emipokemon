@@ -1,0 +1,109 @@
+name: alpha83-build
+
+on:
+  push:
+    branches: [release/0.4.0-alpha.83]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Restore exact successful alpha.82 source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 3 --retry-delay 2 \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            'https://api.github.com/repos/andrewBristowx/Emipokemon/actions/artifacts/9212107104/zip' \
+            -o alpha82-artifact.zip
+          mkdir alpha82-artifact work
+          unzip -q alpha82-artifact.zip -d alpha82-artifact
+          echo 'b9c9b75b3b33b8046acdcdfb448f2168570389e02737965e1a02c31115c0e73a  alpha82-artifact/Emipokemon-0.4.0-alpha.82-source.zip' | sha256sum -c -
+          unzip -q alpha82-artifact/Emipokemon-0.4.0-alpha.82-source.zip -d work
+          grep -q 'mod_version=0.4.0-alpha.82' work/gradle.properties
+
+      - name: Apply exact alpha.83 overlay
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 3 --retry-delay 2 \
+            'https://drive.usercontent.google.com/download?id=1QYVspo6jIqPVRO5xNrYgTKCJXHTb86Qf&export=download&confirm=t' \
+            -o alpha83_overlay.zip
+          echo '44ad92d395172b0469aaf85e2bd0fc59f8cef560b332f3d47b203f2ce7e88e91  alpha83_overlay.zip' | sha256sum -c -
+          unzip -qo alpha83_overlay.zip -d work
+          grep -q 'mod_version=0.4.0-alpha.83' work/gradle.properties
+
+      - name: Preflight alpha.83 regression guards
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          test "$(grep -R '@Test' -h src/test/java | wc -l)" -ge 195
+          grep -q '0.4.0-alpha.83' src/main/java/com/emipokemon/Emipokemon.java
+          grep -q 'GuiNavigationPath getNavigationPath(GuiNavigation navigation)' src/client/java/com/emipokemon/client/emote/EmotesButtonWidget.java
+          grep -q 'super.setFocused(false);' src/client/java/com/emipokemon/client/emote/EmotesButtonWidget.java
+          grep -q 'class MouseOnlyTextFieldWidget extends TextFieldWidget' src/client/java/com/emipokemon/client/emote/EmotePickerOverlay.java
+          grep -q 'if (view.treasure())' src/client/java/com/emipokemon/client/gacha/GachaScreen.java
+          test "$(sha256sum src/main/resources/assets/emipokemon/textures/gui/gacha/treasure_gacha.png | cut -d' ' -f1)" = '7edacc808170565fc508432658f809a14c2fbaa15a013408c3eb949e2b072fd4'
+          test "$(sha256sum src/main/resources/assets/emipokemon/textures/gui/gacha/standard_gacha.png | cut -d' ' -f1)" = '694aadcaca9a8dcaace9c26a9e43cf41e056203855cd380670d0b7c208f4d98d'
+          test "$(sha256sum src/main/resources/assets/emipokemon/textures/gui/gacha/emi_gacha.png | cut -d' ' -f1)" = '4c61d6a00e324a82d060b8c7b9a3abe40daa437fda8d8efb5a4eaf45b973e216'
+          test ! -f src/main/resources/assets/emipokemon/textures/gui/gacha/reveal_sheet.png
+
+      - name: Test and build common server and client with Java 21
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sed -i 's/\r$//' gradlew
+          chmod +x gradlew
+          for attempt in 1 2 3; do
+            if ./gradlew --version --no-daemon; then break; fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            sleep $((attempt * 5))
+          done
+          ./gradlew clean test build --no-daemon --stacktrace
+
+      - name: Verify and package alpha.83
+        shell: bash
+        run: |
+          set -euxo pipefail
+          jar='work/build/libs/emipokemon-0.4.0-alpha.83.jar'
+          test -f "$jar"
+          unzip -p "$jar" fabric.mod.json | grep -q '0.4.0-alpha.83'
+          for entry in \
+            'com/emipokemon/client/emote/EmotesButtonWidget.class' \
+            'com/emipokemon/client/emote/EmotePickerOverlay.class' \
+            'com/emipokemon/client/gacha/GachaScreen.class' \
+            'assets/emipokemon/textures/gui/gacha/treasure_gacha.png'; do
+            unzip -l "$jar" | grep -q "$entry"
+          done
+          test "$(unzip -p "$jar" assets/emipokemon/textures/gui/gacha/treasure_gacha.png | sha256sum | cut -d' ' -f1)" = '7edacc808170565fc508432658f809a14c2fbaa15a013408c3eb949e2b072fd4'
+          cd work
+          zip -qr ../Emipokemon-0.4.0-alpha.83-source.zip . -x 'build/*' '.gradle/*'
+          cd ..
+          sha256sum "$jar" Emipokemon-0.4.0-alpha.83-source.zip > SHA256SUMS-0.4.0-alpha.83.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Emipokemon-0.4.0-alpha.83-github-build
+          path: |
+            work/build/libs/emipokemon-0.4.0-alpha.83.jar
+            Emipokemon-0.4.0-alpha.83-source.zip
+            SHA256SUMS-0.4.0-alpha.83.txt
+            work/CHANGELOG-0.4.0-alpha.83.md
+            work/GUIA-PRUEBAS-0.4.0-alpha.83.md
+          if-no-files-found: error
