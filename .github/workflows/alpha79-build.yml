@@ -1,0 +1,121 @@
+name: alpha79-build
+
+on:
+  push:
+    branches: [release/0.4.0-alpha.79]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Restore exact successful alpha.78 source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 3 --retry-delay 2 \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            'https://api.github.com/repos/andrewBristowx/Emipokemon/actions/artifacts/9205085345/zip' \
+            -o alpha78-artifact.zip
+          mkdir alpha78-artifact work
+          unzip -q alpha78-artifact.zip -d alpha78-artifact
+          echo 'd934e333a125f1e8ea9ee91e39437accb54792db98253288b7f4cb58b83b7f70  alpha78-artifact/Emipokemon-0.4.0-alpha.78-source.zip' | sha256sum -c -
+          unzip -q alpha78-artifact/Emipokemon-0.4.0-alpha.78-source.zip -d work
+          grep -q 'mod_version=0.4.0-alpha.78' work/gradle.properties
+
+      - name: Apply alpha.79 changes
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cp ci/alpha79_apply.py work/alpha79_apply.py
+          cd work
+          python3 alpha79_apply.py
+          rm alpha79_apply.py
+
+      - name: Preflight alpha.79 regression guards
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          test "$(grep -R '@Test' -h src/test/java | wc -l)" -ge 175
+          grep -q 'mod_version=0.4.0-alpha.79' gradle.properties
+          grep -q '"GASHA NORMAL"' src/client/java/com/emipokemon/client/render/SeasonalPokemonWorldRenderer.java
+          grep -q '4.52D + bob' src/client/java/com/emipokemon/client/render/SeasonalPokemonWorldRenderer.java
+          grep -q '1.35F : 1.25F' src/client/java/com/emipokemon/client/render/SeasonalPokemonWorldRenderer.java
+          grep -q 'DURABILITY_MULTIPLIER = 45' src/main/java/com/emipokemon/armor/EmiArmorMaterial.java
+          grep -q 'ArmorItem.Type.CHESTPLATE, 9' src/main/java/com/emipokemon/armor/EmiArmorMaterial.java
+          for p in helmet chestplate leggings boots; do
+            test -f "src/main/resources/assets/emipokemon/models/item/emi_${p}.json"
+            test -f "src/main/resources/assets/emipokemon/textures/item/emi_${p}.png"
+          done
+          test -f src/main/resources/assets/emipokemon/textures/models/armor/emi_layer_1.png
+          test -f src/main/resources/assets/emipokemon/textures/models/armor/emi_layer_2.png
+          test "$(sha256sum src/main/resources/assets/emipokemon/textures/gui/gacha/standard_gacha.png | cut -d' ' -f1)" = '694aadcaca9a8dcaace9c26a9e43cf41e056203855cd380670d0b7c208f4d98d'
+          test "$(sha256sum src/main/resources/assets/emipokemon/textures/gui/gacha/emi_gacha.png | cut -d' ' -f1)" = '4c61d6a00e324a82d060b8c7b9a3abe40daa437fda8d8efb5a4eaf45b973e216'
+          test "$(sha256sum src/main/resources/assets/emipokemon/textures/block/standard_gacha_machine.png | cut -d' ' -f1)" = '42d060134c7809f2617bcf1aa7a06f02750908eb616fcbbfb3b837dbf98e30cd'
+          test "$(sha256sum src/main/resources/assets/emipokemon/textures/block/emi_gacha_machine.png | cut -d' ' -f1)" = '4d0d76caca51f7d167d3197030d7074e9ac2b7e1ade015c5a01c462ef3e4aea0'
+          test ! -f src/main/resources/assets/emipokemon/textures/gui/gacha/reveal_sheet.png
+
+      - name: Test and build common server and client with Java 21
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sed -i 's/\r$//' gradlew
+          chmod +x gradlew
+          for attempt in 1 2 3; do
+            if ./gradlew --version --no-daemon; then break; fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            sleep $((attempt * 5))
+          done
+          ./gradlew clean test build --no-daemon --stacktrace
+
+      - name: Verify and package alpha.79
+        shell: bash
+        run: |
+          set -euxo pipefail
+          jar='work/build/libs/emipokemon-0.4.0-alpha.79.jar'
+          test -f "$jar"
+          unzip -p "$jar" fabric.mod.json | grep -q '0.4.0-alpha.79'
+          for entry in \
+            'com/emipokemon/armor/EmiArmorMaterial.class' \
+            'com/emipokemon/client/render/SeasonalPokemonWorldRenderer.class' \
+            'assets/emipokemon/textures/models/armor/emi_layer_1.png' \
+            'assets/emipokemon/textures/models/armor/emi_layer_2.png' \
+            'assets/emipokemon/models/item/emi_helmet.json' \
+            'assets/emipokemon/models/item/emi_chestplate.json' \
+            'assets/emipokemon/models/item/emi_leggings.json' \
+            'assets/emipokemon/models/item/emi_boots.json'; do
+            unzip -l "$jar" | grep -q "$entry"
+          done
+          if unzip -l "$jar" | grep -q 'textures/gui/gacha/reveal_sheet.png'; then exit 1; fi
+          test "$(unzip -p "$jar" assets/emipokemon/textures/gui/gacha/standard_gacha.png | sha256sum | cut -d' ' -f1)" = '694aadcaca9a8dcaace9c26a9e43cf41e056203855cd380670d0b7c208f4d98d'
+          test "$(unzip -p "$jar" assets/emipokemon/textures/gui/gacha/emi_gacha.png | sha256sum | cut -d' ' -f1)" = '4c61d6a00e324a82d060b8c7b9a3abe40daa437fda8d8efb5a4eaf45b973e216'
+          cd work
+          zip -qr ../Emipokemon-0.4.0-alpha.79-source.zip . -x 'build/*' '.gradle/*'
+          cd ..
+          sha256sum "$jar" Emipokemon-0.4.0-alpha.79-source.zip > SHA256SUMS-0.4.0-alpha.79.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Emipokemon-0.4.0-alpha.79-github-build
+          path: |
+            work/build/libs/emipokemon-0.4.0-alpha.79.jar
+            Emipokemon-0.4.0-alpha.79-source.zip
+            SHA256SUMS-0.4.0-alpha.79.txt
+            work/CHANGELOG-0.4.0-alpha.79.md
+            work/GUIA-PRUEBAS-0.4.0-alpha.79.md
+          if-no-files-found: error
