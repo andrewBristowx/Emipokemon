@@ -1,0 +1,92 @@
+name: alpha90-build
+
+on:
+  push:
+    branches: [release/0.4.0-alpha.90]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Restore exact alpha.90 source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 3 --retry-delay 2 \
+            'https://drive.usercontent.google.com/download?id=1xTf9VME01DtwG2v7-I08_9YkLHpbHUcS&export=download&confirm=t' \
+            -o alpha90-source.zip
+          echo '676225108e37cc14ce692c1b180302c7ea590b3adfe9b84fa8f54d7e49a0c78d  alpha90-source.zip' | sha256sum -c -
+          mkdir work
+          unzip -q alpha90-source.zip -d work
+          grep -q 'mod_version=0.4.0-alpha.90' work/gradle.properties
+          grep -q 'VERSION = "0.4.0-alpha.90"' work/src/main/java/com/emipokemon/Emipokemon.java
+
+      - name: Preflight transparent heart UV fix
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 - <<'PY'
+          import json
+          p='src/main/resources/assets/emipokemon/geo/armor/emi_armor.geo.json'
+          obj=json.load(open(p))
+          found={}
+          for bone in obj['minecraft:geometry'][0]['bones']:
+              if bone['name'] in ('helmet_heart','heart_core'):
+                  uv=bone['cubes'][0]['uv']['north']['uv']
+                  found[bone['name']]=uv
+          assert found == {'helmet_heart':[0,48], 'heart_core':[0,48]}, found
+          PY
+          test -f src/main/resources/assets/emipokemon/textures/models/armor/emi_gecko_armor.png
+          test -f src/test/java/com/emipokemon/alpha90/Alpha90HeartUvRegressionTest.java
+
+      - name: Compile with Java 21
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sed -i 's/\r$//' gradlew
+          chmod +x gradlew
+          ./gradlew clean build -x test --no-daemon --stacktrace
+
+      - name: Run alpha.90 heart UV regression test
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          ./gradlew test --tests com.emipokemon.alpha90.Alpha90HeartUvRegressionTest --no-daemon --stacktrace
+
+      - name: Verify and package alpha.90
+        shell: bash
+        run: |
+          set -euxo pipefail
+          jar='work/build/libs/emipokemon-0.4.0-alpha.90.jar'
+          test -f "$jar"
+          unzip -p "$jar" fabric.mod.json | grep -q '0.4.0-alpha.90'
+          unzip -l "$jar" | grep -q 'assets/emipokemon/geo/armor/emi_armor.geo.json'
+          unzip -l "$jar" | grep -q 'assets/emipokemon/textures/models/armor/emi_gecko_armor.png'
+          cp alpha90-source.zip Emipokemon-0.4.0-alpha.90-source.zip
+          sha256sum "$jar" Emipokemon-0.4.0-alpha.90-source.zip > SHA256SUMS-0.4.0-alpha.90.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Emipokemon-0.4.0-alpha.90-github-build
+          path: |
+            work/build/libs/emipokemon-0.4.0-alpha.90.jar
+            Emipokemon-0.4.0-alpha.90-source.zip
+            SHA256SUMS-0.4.0-alpha.90.txt
+            work/CHANGELOG-0.4.0-alpha.90.md
+            work/GUIA-PRUEBAS-0.4.0-alpha.90.md
+          if-no-files-found: error
