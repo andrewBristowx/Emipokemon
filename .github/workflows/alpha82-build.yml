@@ -1,0 +1,147 @@
+name: alpha82-build
+
+on:
+  push:
+    branches: [release/0.4.0-alpha.82]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Restore exact successful alpha.81 source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 3 --retry-delay 2 \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            'https://api.github.com/repos/andrewBristowx/Emipokemon/actions/artifacts/9210214042/zip' \
+            -o alpha81-artifact.zip
+          mkdir alpha81-artifact work
+          unzip -q alpha81-artifact.zip -d alpha81-artifact
+          echo '69d36ff9ef83d27f57b3471c145c371c7800bef66e83a9922c66483640567308  alpha81-artifact/Emipokemon-0.4.0-alpha.81-source.zip' | sha256sum -c -
+          unzip -q alpha81-artifact/Emipokemon-0.4.0-alpha.81-source.zip -d work
+          grep -q 'mod_version=0.4.0-alpha.81' work/gradle.properties
+
+      - name: Apply exact alpha.82 overlay
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 3 --retry-delay 2 \
+            'https://drive.usercontent.google.com/download?id=1LrwSJhdluXsx8RaO_rl3wqAjD5ZDcomO&export=download&confirm=t' \
+            -o alpha82_overlay.zip
+          echo 'ea45d64cb71016a152653b849f62dd5fb3dca21113445c5a03199c37e60731a3  alpha82_overlay.zip' | sha256sum -c -
+          unzip -qo alpha82_overlay.zip -d work
+          grep -q 'mod_version=0.4.0-alpha.82' work/gradle.properties
+
+      - name: Preflight alpha.82 regression guards
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          test "$(grep -R '@Test' -h src/test/java | wc -l)" -ge 193
+          grep -q '0.4.0-alpha.82' src/main/java/com/emipokemon/Emipokemon.java
+          grep -q 'class TreasureGachaService' src/main/java/com/emipokemon/gacha/treasure/TreasureGachaService.java
+          grep -q 'COMMON, 45.0D' src/main/java/com/emipokemon/gacha/treasure/TreasureGachaService.java
+          grep -q 'UNCOMMON, 27.0D' src/main/java/com/emipokemon/gacha/treasure/TreasureGachaService.java
+          grep -q 'RARE, 15.0D' src/main/java/com/emipokemon/gacha/treasure/TreasureGachaService.java
+          grep -q 'EPIC, 9.0D' src/main/java/com/emipokemon/gacha/treasure/TreasureGachaService.java
+          grep -q 'LEGENDARY, 4.0D' src/main/java/com/emipokemon/gacha/treasure/TreasureGachaService.java
+          grep -q 'NETHERITE_PITY = 30' src/main/java/com/emipokemon/gacha/treasure/TreasureGachaService.java
+          grep -q 'EMI_PITY = 90' src/main/java/com/emipokemon/gacha/treasure/TreasureGachaService.java
+          grep -q 'class EmiSetBonusService' src/main/java/com/emipokemon/armor/EmiSetBonusService.java
+          grep -q 'MOVEMENT_SPEED_BONUS = 0.07D' src/main/java/com/emipokemon/armor/EmiSetBonusService.java
+          grep -q 'chance / SHINY_RELATIVE_MULTIPLIER' src/main/java/com/emipokemon/armor/EmiSetBonusService.java
+          grep -q 'SHINY_CHANCE_CALCULATION' src/main/java/com/emipokemon/armor/EmiSetBonusService.java
+          grep -q 'UNBREAKABLE' src/main/java/com/emipokemon/registry/ModRegistries.java
+          grep -q 'TREASURE_GACHA_MACHINE' src/main/java/com/emipokemon/registry/ModRegistries.java
+          grep -q 'TREASURE_GACHA_TICKET' src/main/java/com/emipokemon/registry/ModRegistries.java
+          grep -q 'TESOROS DE EMI' src/main/java/com/emipokemon/gacha/machine/GachaMachineTextDisplayService.java
+          test -f src/main/resources/assets/emipokemon/textures/gui/gacha/treasure_gacha.png
+          test -f src/main/resources/assets/emipokemon/textures/block/treasure_gacha_machine.png
+          test -f src/main/resources/assets/emipokemon/textures/item/treasure_gacha_ticket.png
+          test -f src/main/resources/data/emipokemon/loot_table/blocks/treasure_gacha_machine.json
+          test "$(sha256sum src/main/resources/assets/emipokemon/textures/gui/gacha/standard_gacha.png | cut -d' ' -f1)" = '694aadcaca9a8dcaace9c26a9e43cf41e056203855cd380670d0b7c208f4d98d'
+          test "$(sha256sum src/main/resources/assets/emipokemon/textures/gui/gacha/emi_gacha.png | cut -d' ' -f1)" = '4c61d6a00e324a82d060b8c7b9a3abe40daa437fda8d8efb5a4eaf45b973e216'
+          test "$(sha256sum src/main/resources/assets/emipokemon/textures/block/standard_gacha_machine.png | cut -d' ' -f1)" = '42d060134c7809f2617bcf1aa7a06f02750908eb616fcbbfb3b837dbf98e30cd'
+          test "$(sha256sum src/main/resources/assets/emipokemon/textures/block/emi_gacha_machine.png | cut -d' ' -f1)" = '4d0d76caca51f7d167d3197030d7074e9ac2b7e1ade015c5a01c462ef3e4aea0'
+          test "$(sha256sum src/main/resources/assets/emipokemon/textures/gui/gacha/treasure_gacha.png | cut -d' ' -f1)" != '4c61d6a00e324a82d060b8c7b9a3abe40daa437fda8d8efb5a4eaf45b973e216'
+          test ! -f src/main/resources/assets/emipokemon/textures/gui/gacha/reveal_sheet.png
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+          for layer in (1,2):
+              p=Path(f'src/main/resources/assets/emipokemon/textures/models/armor/emi_layer_{layer}.png')
+              im=Image.open(p).convert('RGBA')
+              assert im.size==(64,32)
+              px=list(im.getdata()); visible=sum(a>0 for r,g,b,a in px); transparent=2048-visible
+              assert 100 < visible < 1500 and transparent > 500
+              black=sum(a>0 and max(r,g,b)<90 for r,g,b,a in px)
+              pink=sum(a>0 and r>g and b>g for r,g,b,a in px)
+              gold=sum(a>0 and r>150 and g>90 and b<100 for r,g,b,a in px)
+              assert black>10 and pink>20 and gold>0
+          PY
+
+      - name: Test and build common server and client with Java 21
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sed -i 's/\r$//' gradlew
+          chmod +x gradlew
+          for attempt in 1 2 3; do
+            if ./gradlew --version --no-daemon; then break; fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            sleep $((attempt * 5))
+          done
+          ./gradlew clean test build --no-daemon --stacktrace
+
+      - name: Verify and package alpha.82
+        shell: bash
+        run: |
+          set -euxo pipefail
+          jar='work/build/libs/emipokemon-0.4.0-alpha.82.jar'
+          test -f "$jar"
+          unzip -p "$jar" fabric.mod.json | grep -q '0.4.0-alpha.82'
+          for entry in \
+            'com/emipokemon/gacha/treasure/TreasureGachaService.class' \
+            'com/emipokemon/armor/EmiSetBonusService.class' \
+            'com/emipokemon/gacha/machine/GachaMachineBlockEntity.class' \
+            'assets/emipokemon/textures/gui/gacha/treasure_gacha.png' \
+            'assets/emipokemon/textures/block/treasure_gacha_machine.png' \
+            'assets/emipokemon/textures/item/treasure_gacha_ticket.png' \
+            'assets/emipokemon/textures/models/armor/emi_layer_1.png' \
+            'assets/emipokemon/textures/models/armor/emi_layer_2.png'; do
+            unzip -l "$jar" | grep -q "$entry"
+          done
+          test "$(unzip -p "$jar" assets/emipokemon/textures/gui/gacha/standard_gacha.png | sha256sum | cut -d' ' -f1)" = '694aadcaca9a8dcaace9c26a9e43cf41e056203855cd380670d0b7c208f4d98d'
+          test "$(unzip -p "$jar" assets/emipokemon/textures/gui/gacha/emi_gacha.png | sha256sum | cut -d' ' -f1)" = '4c61d6a00e324a82d060b8c7b9a3abe40daa437fda8d8efb5a4eaf45b973e216'
+          if unzip -l "$jar" | grep -q 'textures/gui/gacha/reveal_sheet.png'; then exit 1; fi
+          cd work
+          zip -qr ../Emipokemon-0.4.0-alpha.82-source.zip . -x 'build/*' '.gradle/*'
+          cd ..
+          sha256sum "$jar" Emipokemon-0.4.0-alpha.82-source.zip > SHA256SUMS-0.4.0-alpha.82.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Emipokemon-0.4.0-alpha.82-github-build
+          path: |
+            work/build/libs/emipokemon-0.4.0-alpha.82.jar
+            Emipokemon-0.4.0-alpha.82-source.zip
+            SHA256SUMS-0.4.0-alpha.82.txt
+            work/CHANGELOG-0.4.0-alpha.82.md
+            work/GUIA-PRUEBAS-0.4.0-alpha.82.md
+          if-no-files-found: error
