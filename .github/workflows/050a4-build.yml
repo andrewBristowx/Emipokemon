@@ -1,0 +1,150 @@
+name: 050a4-build
+
+on:
+  push:
+    branches: [release/0.5.0-alpha.4]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Restore exact 0.5.0-alpha.4 source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 3 --retry-delay 2 \
+            'https://drive.usercontent.google.com/download?id=1sfORjWkWr8oHEMyV1gPP2RGJ_gLrvDsr&export=download&confirm=t' \
+            -o Emipokemon-0.5.0-alpha.4-source.zip
+          echo '4c0dd68e098df9fe5cdeeb32faf1007178971a70fb6f79ceba199a4844da8a10  Emipokemon-0.5.0-alpha.4-source.zip' | sha256sum -c -
+          mkdir work
+          unzip -q Emipokemon-0.5.0-alpha.4-source.zip -d work
+          grep -q 'mod_version=0.5.0-alpha.4' work/gradle.properties
+          grep -q 'VERSION = "0.5.0-alpha.4"' work/src/main/java/com/emipokemon/Emipokemon.java
+
+      - name: Validate alpha.4 species, regions and protected assets
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, json, re, struct
+
+          root = Path('src/main/resources')
+          eevee = json.loads((root/'data/emipokemon/species/custom/eevee_gatito.json').read_text())
+          snorlax = json.loads((root/'data/emipokemon/species/custom/snorlax_emi.json').read_text())
+          assert eevee['nationalPokedexNumber'] == 10001
+          assert snorlax['nationalPokedexNumber'] == 10002
+          for s in (eevee, snorlax):
+              assert s['primaryType'] == 'fairy' and s['secondaryType'] == 'normal'
+              assert s['evolutions'] == []
+          assert eevee['baseStats']['special_attack'] == 115
+          assert eevee['baseStats']['speed'] == 100
+          assert eevee['baseStats']['special_attack'] > eevee['baseStats']['attack']
+          for m in ['1:disarmingvoice','15:drainingkiss','30:dazzlinggleam','50:moonblast']:
+              assert m in eevee['moves']
+          for m in ['1:disarmingvoice','24:drainingkiss','32:playrough','40:dazzlinggleam','56:moonblast']:
+              assert m in snorlax['moves']
+
+          er = json.loads((root/'assets/cobblemon/bedrock/pokemon/resolvers/eevee_gatito/0_eevee_gatito_base.json').read_text())
+          sr = json.loads((root/'assets/cobblemon/bedrock/pokemon/resolvers/snorlax_emi/0_snorlax_emi_base.json').read_text())
+          assert er['species'] == 'emipokemon:eevee_gatito'
+          assert sr['species'] == 'emipokemon:snorlax_emi'
+          assert er['variations'][0]['poser'] == 'cobblemon:eevee'
+          assert sr['variations'][0]['poser'] == 'cobblemon:snorlax'
+          assert not (root/'data/cobblemon/species/generation1/eevee.json').exists()
+          assert not (root/'data/cobblemon/species/generation1/snorlax.json').exists()
+          assert not (root/'assets/cobblemon/bedrock/pokemon/models/eevee/eevee.geo.json').exists()
+          assert not (root/'assets/cobblemon/bedrock/pokemon/models/snorlax/snorlax.geo.json').exists()
+          assert (root/'assets/cobblemon/bedrock/pokemon/models/eevee_gatito/LICENSE_COBBLEMON_MODEL.txt').is_file()
+          assert (root/'assets/cobblemon/bedrock/pokemon/models/snorlax_emi/LICENSE_COBBLEMON_MODEL.txt').is_file()
+
+          catalog = Path('src/main/java/com/emipokemon/challenge/ChallengeCatalog.java').read_text()
+          profiles = re.findall(r'\bp\("(kanto|johto|hoenn|sinnoh)"\s*,', catalog)
+          assert len(profiles) == 52
+          assert {r:profiles.count(r) for r in set(profiles)} == {'kanto':13,'johto':13,'hoenn':13,'sinnoh':13}
+
+          quests = Path('src/main/java/com/emipokemon/progress/QuestCatalog.java').read_text()
+          for token in ['structure_match:radio,tower','structure_match:magma,base','structure_match:aqua,base','structure_match:galactic,hq','Torre Quemada','Pilar Celeste','Columna Lanza','Paraíso Floral']:
+              assert token in quests, token
+
+          challenge = Path('src/main/java/com/emipokemon/challenge/ChallengeService.java').read_text()
+          assert 'Elite Four' in challenge and 'Champion' in challenge
+
+          expected_pngs={
+            'sword':'1540614909181e432680a0860ed39702553929919b45b7681155b07d981e078b',
+            'pickaxe':'6954d581169275d213046e41772a57f934ab0ffd84f311e2ea6fc344e0d0c1d7',
+            'axe':'fe9d4f5d41e86122fcf040f5381bf173e0b0f5334a7314f95ce5a89e2a96774a',
+            'shovel':'f528d40ff3f1cd947b5a6e2b8bbea9e5a0b2f4bbbec17b4eaaabf0a5d484399a',
+            'hoe':'946b14b5ce1f31295c8be2cc401aff91bc63173051f10e8d6de6e6fde3690ca2'}
+          for tool, expected in expected_pngs.items():
+              data=(root/f'assets/emipokemon/textures/item/emi_{tool}.png').read_bytes()
+              assert struct.unpack('>II', data[16:24]) == (16,16)
+              assert hashlib.sha256(data).hexdigest() == expected
+              model=(root/f'assets/emipokemon/models/item/emi_{tool}.json').read_text()
+              assert 'minecraft:item/handheld' in model and '"display"' not in model
+          PY
+
+      - name: Compile with Java 21
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sed -i 's/\r$//' gradlew
+          chmod +x gradlew
+          ./gradlew clean build -x test --no-daemon --stacktrace
+
+      - name: Run alpha.4 and inherited regression tests
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          ./gradlew test \
+            --tests com.emipokemon.v050a4.Version050Alpha4RegressionTest \
+            --tests com.emipokemon.challenge.ChallengeCatalogTest \
+            --tests com.emipokemon.progress.QuestCatalogTest \
+            --tests com.emipokemon.data.PlayerDataMigrationTest \
+            --tests com.emipokemon.alpha98.Alpha98VanillaHandheldToolsRegressionTest \
+            --tests com.emipokemon.alpha90.Alpha90HeartUvRegressionTest \
+            --no-daemon --stacktrace
+
+      - name: Verify final jar
+        shell: bash
+        run: |
+          set -euxo pipefail
+          jar='work/build/libs/emipokemon-0.5.0-alpha.4.jar'
+          test -f "$jar"
+          unzip -p "$jar" fabric.mod.json | grep -q '0.5.0-alpha.4'
+          unzip -l "$jar" | grep -q 'data/emipokemon/species/custom/eevee_gatito.json'
+          unzip -l "$jar" | grep -q 'data/emipokemon/species/custom/snorlax_emi.json'
+          unzip -l "$jar" | grep -q 'assets/cobblemon/bedrock/pokemon/models/eevee_gatito/eevee_gatito.geo.json'
+          unzip -l "$jar" | grep -q 'assets/cobblemon/bedrock/pokemon/models/snorlax_emi/snorlax_emi.geo.json'
+          unzip -l "$jar" | grep -q 'assets/cobblemon/textures/pokemon/eevee_gatito/eevee_gatito.png'
+          unzip -l "$jar" | grep -q 'assets/cobblemon/textures/pokemon/snorlax_emi/snorlax_emi.png'
+          unzip -l "$jar" | grep -q 'LICENSE_COBBLEMON_MODEL.txt'
+          unzip -p "$jar" assets/emipokemon/models/item/emi_sword.json | grep -q 'minecraft:item/handheld'
+          sha256sum "$jar" Emipokemon-0.5.0-alpha.4-source.zip > SHA256SUMS-0.5.0-alpha.4.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Emipokemon-0.5.0-alpha.4-github-build
+          path: |
+            work/build/libs/emipokemon-0.5.0-alpha.4.jar
+            Emipokemon-0.5.0-alpha.4-source.zip
+            SHA256SUMS-0.5.0-alpha.4.txt
+            work/CHANGELOG-0.5.0-alpha.4.md
+            work/GUIA-PRUEBAS-0.5.0-alpha.4.md
+            work/THIRD-PARTY-ASSETS-0.5.0-alpha.4.md
+          if-no-files-found: error
