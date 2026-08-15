@@ -1,0 +1,170 @@
+name: alpha98-build
+
+on:
+  push:
+    branches: [release/0.4.0-alpha.98]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Restore exact validated alpha.90 source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 3 --retry-delay 2 \
+            'https://drive.usercontent.google.com/download?id=1xTf9VME01DtwG2v7-I08_9YkLHpbHUcS&export=download&confirm=t' \
+            -o alpha90-source.zip
+          echo '676225108e37cc14ce692c1b180302c7ea590b3adfe9b84fa8f54d7e49a0c78d  alpha90-source.zip' | sha256sum -c -
+          mkdir work
+          unzip -q alpha90-source.zip -d work
+          grep -q 'mod_version=0.4.0-alpha.90' work/gradle.properties
+          grep -q 'VERSION = "0.4.0-alpha.90"' work/src/main/java/com/emipokemon/Emipokemon.java
+
+      - name: Apply alpha.98 vanilla handheld tool patch
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 ../ci/alpha98/patch_alpha98.py
+          grep -q 'mod_version=0.4.0-alpha.98' gradle.properties
+          grep -q 'VERSION = "0.4.0-alpha.98"' src/main/java/com/emipokemon/Emipokemon.java
+
+      - name: Validate visual invariants before compile
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, struct, zlib
+
+          expected_masks = {
+              'sword': 'd3250ae79059069e09ef003438ef9d46b086addbc676193690aea327be245240',
+              'pickaxe': '59513be2ea3913d3afa289c049bfe472629961118c2296ae5f684e580d3a400b',
+              'axe': '10fb5ca663837caa183d72ce4d2dbfae6b88356d640c9a4ca1f44980c039bc81',
+              'shovel': 'f22732fc3b17f385b6ee8dc02de9a9a6dc9d060a9d1e2048f5b0bbeb51ffc895',
+              'hoe': 'c8be7f8771d94296af2b6a989e8cb5c87236cee44b2ab1659182b86c92f4c411',
+          }
+
+          def rgba_from_png(path):
+              data = Path(path).read_bytes()
+              assert data[:8] == b'\x89PNG\r\n\x1a\n'
+              w,h = struct.unpack('>II', data[16:24])
+              assert (w,h) == (16,16), (path,w,h)
+              bit_depth, color_type = data[24], data[25]
+              assert (bit_depth,color_type) == (8,6), (path,bit_depth,color_type)
+              pos=8; idat=b''
+              while pos < len(data):
+                  ln=struct.unpack('>I',data[pos:pos+4])[0]
+                  typ=data[pos+4:pos+8]
+                  chunk=data[pos+8:pos+8+ln]
+                  pos += 12+ln
+                  if typ == b'IDAT': idat += chunk
+                  if typ == b'IEND': break
+              raw=zlib.decompress(idat)
+              stride=w*4
+              rows=[]; prev=bytearray(stride); off=0
+              for _ in range(h):
+                  filt=raw[off]; off+=1
+                  cur=bytearray(raw[off:off+stride]); off+=stride
+                  bpp=4
+                  for i in range(stride):
+                      a=cur[i-bpp] if i>=bpp else 0
+                      b=prev[i]
+                      c=prev[i-bpp] if i>=bpp else 0
+                      x=cur[i]
+                      if filt==1: cur[i]=(x+a)&255
+                      elif filt==2: cur[i]=(x+b)&255
+                      elif filt==3: cur[i]=(x+((a+b)//2))&255
+                      elif filt==4:
+                          p=a+b-c; pa=abs(p-a); pb=abs(p-b); pc=abs(p-c)
+                          pr=a if pa<=pb and pa<=pc else (b if pb<=pc else c)
+                          cur[i]=(x+pr)&255
+                      elif filt!=0: raise AssertionError((path,'filter',filt))
+                  rows.append(bytes(cur)); prev=cur
+              return b''.join(rows)
+
+          for tool, expected in expected_masks.items():
+              p=f'src/main/resources/assets/emipokemon/textures/item/emi_{tool}.png'
+              rgba=rgba_from_png(p)
+              mask=bytes(255 if rgba[i+3] else 0 for i in range(0,len(rgba),4))
+              actual=hashlib.sha256(mask).hexdigest()
+              assert actual == expected, (tool,actual,expected)
+              assert all(rgba[i+3] in (0,255) for i in range(0,len(rgba),4)), tool
+              model=Path(f'src/main/resources/assets/emipokemon/models/item/emi_{tool}.json').read_text()
+              assert '"parent": "minecraft:item/handheld"' in model
+              assert '"display"' not in model
+
+          client=Path('src/client/java/com/emipokemon/client/EmipokemonClient.java').read_text()
+          assert 'registerEmiToolRenderer' not in client
+          assert 'registerEmiArmorRenderer(ModRegistries.EMI_HELMET)' in client
+          for cls in ('EmiSwordItem.java','EmiPickaxeItem.java','EmiAxeItem.java','EmiShovelItem.java','EmiHoeItem.java'):
+              code=Path('src/main/java/com/emipokemon/tools',cls).read_text()
+              assert 'implements EmiGeoToolItem' not in code, cls
+          PY
+
+      - name: Package exact alpha.98 source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          (cd work && zip -qr ../Emipokemon-0.4.0-alpha.98-source.zip . -x '.gradle/*' 'build/*')
+
+      - name: Compile with Java 21
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sed -i 's/\r$//' gradlew
+          chmod +x gradlew
+          ./gradlew clean build -x test --no-daemon --stacktrace
+
+      - name: Run alpha.98 tool and alpha.90 armor regression tests
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          ./gradlew test \
+            --tests com.emipokemon.alpha98.Alpha98VanillaHandheldToolsRegressionTest \
+            --tests com.emipokemon.alpha90.Alpha90HeartUvRegressionTest \
+            --no-daemon --stacktrace
+
+      - name: Verify and package alpha.98
+        shell: bash
+        run: |
+          set -euxo pipefail
+          jar='work/build/libs/emipokemon-0.4.0-alpha.98.jar'
+          test -f "$jar"
+          unzip -p "$jar" fabric.mod.json | grep -q '0.4.0-alpha.98'
+          unzip -p "$jar" assets/emipokemon/models/item/emi_sword.json | grep -q 'minecraft:item/handheld'
+          ! unzip -p "$jar" assets/emipokemon/models/item/emi_sword.json | grep -q 'builtin/entity'
+          unzip -l "$jar" | grep -q 'assets/emipokemon/geo/armor/emi_armor.geo.json'
+          unzip -l "$jar" | grep -q 'assets/emipokemon/textures/models/armor/emi_gecko_armor.png'
+          for tool in sword pickaxe axe shovel hoe; do
+            unzip -p "$jar" "assets/emipokemon/models/item/emi_${tool}.json" | grep -q 'minecraft:item/handheld'
+            unzip -p "$jar" "assets/emipokemon/textures/item/emi_${tool}.png" > "/tmp/emi_${tool}.png"
+          done
+          sha256sum "$jar" Emipokemon-0.4.0-alpha.98-source.zip > SHA256SUMS-0.4.0-alpha.98.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Emipokemon-0.4.0-alpha.98-github-build
+          path: |
+            work/build/libs/emipokemon-0.4.0-alpha.98.jar
+            Emipokemon-0.4.0-alpha.98-source.zip
+            SHA256SUMS-0.4.0-alpha.98.txt
+            work/CHANGELOG-0.4.0-alpha.98.md
+            work/GUIA-PRUEBAS-0.4.0-alpha.98.md
+          if-no-files-found: error
