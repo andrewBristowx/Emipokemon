@@ -39,6 +39,14 @@ jobs:
         run: |
           set -euxo pipefail
           python3 ../ci/alpha98/patch_alpha98.py
+          # Correct the shovel payload byte-for-byte to the validated local alpha.98 sprite.
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64, hashlib
+          data=base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAk0lEQVR4nGNgGGjASIriI3YT/8PYNofySdLLcMRu4v//X/7DsYqY1n/CutA0Pzj17v+DU+/+f3rwE24AEzGa9RZlMDy89p7h3t77JLkaDqzUXP7vaz+LYTvRmr/s8PivIqZFmWYGBgYGkjW/CJpLmo3ImstiWuis2UrN5b+Vmsv/iQVLybcZOcDIAipiWpQZQA4AACzccC3nCXbqAAAAAElFTkSuQmCC')
+          assert hashlib.sha256(data).hexdigest() == 'f528d40ff3f1cd947b5a6e2b8bbea9e5a0b2f4bbbec17b4eaaabf0a5d484399a'
+          Path('src/main/resources/assets/emipokemon/textures/item/emi_shovel.png').write_bytes(data)
+          PY
           grep -q 'mod_version=0.4.0-alpha.98' gradle.properties
           grep -q 'VERSION = "0.4.0-alpha.98"' src/main/java/com/emipokemon/Emipokemon.java
 
