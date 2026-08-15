@@ -49,68 +49,35 @@ jobs:
           set -euxo pipefail
           python3 - <<'PY'
           from pathlib import Path
-          import hashlib, struct, zlib
+          import hashlib, struct
 
-          expected_masks = {
-              'sword': 'd3250ae79059069e09ef003438ef9d46b086addbc676193690aea327be245240',
-              'pickaxe': '59513be2ea3913d3afa289c049bfe472629961118c2296ae5f684e580d3a400b',
-              'axe': '10fb5ca663837caa183d72ce4d2dbfae6b88356d640c9a4ca1f44980c039bc81',
-              'shovel': 'f22732fc3b17f385b6ee8dc02de9a9a6dc9d060a9d1e2048f5b0bbeb51ffc895',
-              'hoe': 'c8be7f8771d94296af2b6a989e8cb5c87236cee44b2ab1659182b86c92f4c411',
+          expected_pngs = {
+              'sword': '1540614909181e432680a0860ed39702553929919b45b7681155b07d981e078b',
+              'pickaxe': '6954d581169275d213046e41772a57f934ab0ffd84f311e2ea6fc344e0d0c1d7',
+              'axe': 'fe9d4f5d41e86122fcf040f5381bf173e0b0f5334a7314f95ce5a89e2a96774a',
+              'shovel': 'f528d40ff3f1cd947b5a6e2b8bbea9e5a0b2f4bbbec17b4eaaabf0a5d484399a',
+              'hoe': '946b14b5ce1f31295c8be2cc401aff91bc63173051f10e8d6de6e6fde3690ca2',
           }
 
-          def rgba_from_png(path):
-              data = Path(path).read_bytes()
-              assert data[:8] == b'\x89PNG\r\n\x1a\n'
-              w,h = struct.unpack('>II', data[16:24])
-              assert (w,h) == (16,16), (path,w,h)
-              bit_depth, color_type = data[24], data[25]
-              assert (bit_depth,color_type) == (8,6), (path,bit_depth,color_type)
-              pos=8; idat=b''
-              while pos < len(data):
-                  ln=struct.unpack('>I',data[pos:pos+4])[0]
-                  typ=data[pos+4:pos+8]
-                  chunk=data[pos+8:pos+8+ln]
-                  pos += 12+ln
-                  if typ == b'IDAT': idat += chunk
-                  if typ == b'IEND': break
-              raw=zlib.decompress(idat)
-              stride=w*4
-              rows=[]; prev=bytearray(stride); off=0
-              for _ in range(h):
-                  filt=raw[off]; off+=1
-                  cur=bytearray(raw[off:off+stride]); off+=stride
-                  bpp=4
-                  for i in range(stride):
-                      a=cur[i-bpp] if i>=bpp else 0
-                      b=prev[i]
-                      c=prev[i-bpp] if i>=bpp else 0
-                      x=cur[i]
-                      if filt==1: cur[i]=(x+a)&255
-                      elif filt==2: cur[i]=(x+b)&255
-                      elif filt==3: cur[i]=(x+((a+b)//2))&255
-                      elif filt==4:
-                          p=a+b-c; pa=abs(p-a); pb=abs(p-b); pc=abs(p-c)
-                          pr=a if pa<=pb and pa<=pc else (b if pb<=pc else c)
-                          cur[i]=(x+pr)&255
-                      elif filt!=0: raise AssertionError((path,'filter',filt))
-                  rows.append(bytes(cur)); prev=cur
-              return b''.join(rows)
-
-          for tool, expected in expected_masks.items():
-              p=f'src/main/resources/assets/emipokemon/textures/item/emi_{tool}.png'
-              rgba=rgba_from_png(p)
-              mask=bytes(255 if rgba[i+3] else 0 for i in range(0,len(rgba),4))
-              actual=hashlib.sha256(mask).hexdigest()
-              assert actual == expected, (tool,actual,expected)
-              assert all(rgba[i+3] in (0,255) for i in range(0,len(rgba),4)), tool
+          for tool, expected in expected_pngs.items():
+              p=Path(f'src/main/resources/assets/emipokemon/textures/item/emi_{tool}.png')
+              data=p.read_bytes()
+              assert data[:8] == b'\x89PNG\r\n\x1a\n', tool
+              assert struct.unpack('>II', data[16:24]) == (16,16), tool
+              assert hashlib.sha256(data).hexdigest() == expected, tool
               model=Path(f'src/main/resources/assets/emipokemon/models/item/emi_{tool}.json').read_text()
-              assert '"parent": "minecraft:item/handheld"' in model
-              assert '"display"' not in model
+              assert '"parent": "minecraft:item/handheld"' in model, tool
+              assert '"display"' not in model, tool
+              assert '"scale"' not in model, tool
+              assert '"translation"' not in model, tool
+              assert '"rotation"' not in model, tool
 
           client=Path('src/client/java/com/emipokemon/client/EmipokemonClient.java').read_text()
           assert 'registerEmiToolRenderer' not in client
           assert 'registerEmiArmorRenderer(ModRegistries.EMI_HELMET)' in client
+          assert 'registerEmiArmorRenderer(ModRegistries.EMI_CHESTPLATE)' in client
+          assert 'registerEmiArmorRenderer(ModRegistries.EMI_LEGGINGS)' in client
+          assert 'registerEmiArmorRenderer(ModRegistries.EMI_BOOTS)' in client
           for cls in ('EmiSwordItem.java','EmiPickaxeItem.java','EmiAxeItem.java','EmiShovelItem.java','EmiHoeItem.java'):
               code=Path('src/main/java/com/emipokemon/tools',cls).read_text()
               assert 'implements EmiGeoToolItem' not in code, cls
