@@ -83,7 +83,7 @@ jobs:
               assert pair in quests, pair
 
           challenge = Path('src/main/java/com/emipokemon/challenge/ChallengeService.java').read_text()
-          assert 'Elite Four' in challenge and 'Champion' in challenge
+          assert 'isChampion()' in challenge and 'Alto Mando' in challenge
 
           expected_pngs={
             'sword':'1540614909181e432680a0860ed39702553929919b45b7681155b07d981e078b',
