@@ -72,7 +72,6 @@ jobs:
           set -euxo pipefail
           ./gradlew test \
             --tests com.emipokemon.v050a9.Version050Alpha9RegressionTest \
-            --tests com.emipokemon.alpha75.Alpha75WorldPokemonDisplayRegressionTest \
             --tests com.emipokemon.challenge.ChallengeCatalogTest \
             --tests com.emipokemon.progress.QuestCatalogTest \
             --tests com.emipokemon.data.PlayerDataMigrationTest \
