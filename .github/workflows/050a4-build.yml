@@ -77,8 +77,10 @@ jobs:
           assert {r:profiles.count(r) for r in set(profiles)} == {'kanto':13,'johto':13,'hoenn':13,'sinnoh':13}
 
           quests = Path('src/main/java/com/emipokemon/progress/QuestCatalog.java').read_text()
-          for token in ['structure_match:radio,tower','structure_match:magma,base','structure_match:aqua,base','structure_match:galactic,hq','Torre Quemada','Pilar Celeste','Columna Lanza','Paraíso Floral']:
+          for token in ['Torre Radio del Team Rocket','Base del Team Magma','Base del Team Aqua','Cuartel General del Team Galactic','Torre Quemada','Pilar Celeste','Columna Lanza','Paraíso Floral','adventureStructure']:
               assert token in quests, token
+          for pair in ['\"radio\", \"tower\"','\"magma\", \"base\"','\"aqua\", \"base\"','\"galactic\", \"hq\"']:
+              assert pair in quests, pair
 
           challenge = Path('src/main/java/com/emipokemon/challenge/ChallengeService.java').read_text()
           assert 'Elite Four' in challenge and 'Champion' in challenge
