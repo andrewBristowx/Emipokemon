@@ -27,4 +27,15 @@ with zipfile.ZipFile(io.BytesIO(data)) as archive:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(content)
 
-print(f"Applied exact Emipokemon 0.5.0-alpha.2 patch ({len(names)} files).")
+# The original alpha.2 payload has one surplus closing parenthesis in the
+# Brigadier command builder. Keep the payload digest immutable, then apply the
+# deterministic source correction before packaging/compiling.
+commands = Path("src/main/java/com/emipokemon/challenge/ChallengeCommands.java")
+source = commands.read_text()
+bad = 'StringArgumentType.getString(context, "lider"))))))));'
+good = 'StringArgumentType.getString(context, "lider")))))));'
+if source.count(bad) != 1:
+    raise SystemExit("ChallengeCommands syntax correction target not found exactly once")
+commands.write_text(source.replace(bad, good))
+
+print(f"Applied exact Emipokemon 0.5.0-alpha.2 patch ({len(names)} files) and command syntax correction.")
