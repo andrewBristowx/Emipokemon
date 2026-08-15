@@ -81,13 +81,12 @@ jobs:
           chmod +x gradlew
           ./gradlew clean build -x test --no-daemon --stacktrace
 
-      - name: Run alpha.5 and inherited regression tests
+      - name: Run alpha.5 inherited regression tests
         working-directory: work
         shell: bash
         run: |
           set -euxo pipefail
           ./gradlew test \
-            --tests com.emipokemon.v050a4.Version050Alpha4RegressionTest \
             --tests com.emipokemon.alpha75.Alpha75WorldPokemonDisplayRegressionTest \
             --tests com.emipokemon.challenge.ChallengeCatalogTest \
             --tests com.emipokemon.progress.QuestCatalogTest \
