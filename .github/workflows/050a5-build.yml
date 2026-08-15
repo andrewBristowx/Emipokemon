@@ -1,0 +1,118 @@
+name: 050a5-build
+
+on:
+  push:
+    branches: [release/0.5.0-alpha.5]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Restore exact 0.5.0-alpha.5 source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 3 --retry-delay 2 \
+            'https://drive.usercontent.google.com/download?id=1UlohfAz5X_VJsnF-KtFHQ3nRDDwV9Gcs&export=download&confirm=t' \
+            -o Emipokemon-0.5.0-alpha.5-source.zip
+          echo '24117bbbc2e713afa74a81df76e43cabb870a091c6a73140e06f151b16eb2389  Emipokemon-0.5.0-alpha.5-source.zip' | sha256sum -c -
+          mkdir work
+          unzip -q Emipokemon-0.5.0-alpha.5-source.zip -d work
+          grep -q 'mod_version=0.5.0-alpha.5' work/gradle.properties
+          grep -q 'VERSION = "0.5.0-alpha.5"' work/src/main/java/com/emipokemon/Emipokemon.java
+
+      - name: Validate alpha.5 gasha changes and protected assets
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, json, struct
+
+          root = Path('src/main/resources')
+          machine = Path('src/main/java/com/emipokemon/gacha/machine/GachaMachineBlockEntity.java').read_text()
+          banners = Path('src/main/java/com/emipokemon/gacha/banner/BannerManager.java').read_text()
+          definition = Path('src/main/java/com/emipokemon/gacha/banner/BannerDefinition.java').read_text()
+          reward = Path('src/main/java/com/emipokemon/gacha/reward/CobblemonRewardService.java').read_text()
+
+          assert 'eevee_gatito' in machine
+          assert 'bannerId = "emi_special"' in machine
+          assert 'emi_special' in banners and 'emi_custom_event' in banners
+          assert 'excludedLabels.contains("custom")' in banners
+          assert 'minPerfectIvsByTier' in definition and 'rareNatureChance' in definition
+          assert 'nature=' in reward and 'min_perfect_ivs=' in reward
+
+          eevee = json.loads((root/'data/emipokemon/species/custom/eevee_gatito.json').read_text())
+          snorlax = json.loads((root/'data/emipokemon/species/custom/snorlax_emi.json').read_text())
+          assert eevee['primaryType'] == 'fairy' and eevee['secondaryType'] == 'normal'
+          assert snorlax['primaryType'] == 'fairy' and snorlax['secondaryType'] == 'normal'
+
+          expected_pngs={
+            'sword':'1540614909181e432680a0860ed39702553929919b45b7681155b07d981e078b',
+            'pickaxe':'6954d581169275d213046e41772a57f934ab0ffd84f311e2ea6fc344e0d0c1d7',
+            'axe':'fe9d4f5d41e86122fcf040f5381bf173e0b0f5334a7314f95ce5a89e2a96774a',
+            'shovel':'f528d40ff3f1cd947b5a6e2b8bbea9e5a0b2f4bbbec17b4eaaabf0a5d484399a',
+            'hoe':'946b14b5ce1f31295c8be2cc401aff91bc63173051f10e8d6de6e6fde3690ca2'}
+          for tool, expected in expected_pngs.items():
+              data=(root/f'assets/emipokemon/textures/item/emi_{tool}.png').read_bytes()
+              assert struct.unpack('>II', data[16:24]) == (16,16)
+              assert hashlib.sha256(data).hexdigest() == expected
+          PY
+
+      - name: Compile with Java 21
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sed -i 's/\r$//' gradlew
+          chmod +x gradlew
+          ./gradlew clean build -x test --no-daemon --stacktrace
+
+      - name: Run alpha.5 and inherited regression tests
+        working-directory: work
+        shell: bash
+        run: |
+          set -euxo pipefail
+          ./gradlew test \
+            --tests com.emipokemon.v050a4.Version050Alpha4RegressionTest \
+            --tests com.emipokemon.alpha75.Alpha75WorldPokemonDisplayRegressionTest \
+            --tests com.emipokemon.challenge.ChallengeCatalogTest \
+            --tests com.emipokemon.progress.QuestCatalogTest \
+            --tests com.emipokemon.data.PlayerDataMigrationTest \
+            --tests com.emipokemon.alpha98.Alpha98VanillaHandheldToolsRegressionTest \
+            --tests com.emipokemon.alpha90.Alpha90HeartUvRegressionTest \
+            --no-daemon --stacktrace
+
+      - name: Verify final jar
+        shell: bash
+        run: |
+          set -euxo pipefail
+          jar='work/build/libs/emipokemon-0.5.0-alpha.5.jar'
+          test -f "$jar"
+          unzip -p "$jar" fabric.mod.json | grep -q '0.5.0-alpha.5'
+          unzip -l "$jar" | grep -q 'data/emipokemon/species/custom/eevee_gatito.json'
+          unzip -l "$jar" | grep -q 'data/emipokemon/species/custom/snorlax_emi.json'
+          unzip -p "$jar" assets/emipokemon/models/item/emi_sword.json | grep -q 'minecraft:item/handheld'
+          sha256sum "$jar" Emipokemon-0.5.0-alpha.5-source.zip > SHA256SUMS-0.5.0-alpha.5.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Emipokemon-0.5.0-alpha.5-github-build
+          path: |
+            work/build/libs/emipokemon-0.5.0-alpha.5.jar
+            Emipokemon-0.5.0-alpha.5-source.zip
+            SHA256SUMS-0.5.0-alpha.5.txt
+          if-no-files-found: error
