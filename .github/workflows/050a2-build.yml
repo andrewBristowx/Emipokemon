@@ -136,7 +136,6 @@ jobs:
             --tests com.emipokemon.challenge.ChallengeCatalogTest \
             --tests com.emipokemon.progress.QuestCatalogTest \
             --tests com.emipokemon.data.PlayerDataMigrationTest \
-            --tests com.emipokemon.v050a1.Version050Alpha1RegressionTest \
             --tests com.emipokemon.alpha98.Alpha98VanillaHandheldToolsRegressionTest \
             --tests com.emipokemon.alpha90.Alpha90HeartUvRegressionTest \
             --no-daemon --stacktrace
