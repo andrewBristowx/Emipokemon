@@ -27,7 +27,7 @@ jobs:
           curl -fL --retry 3 --retry-delay 2 \
             'https://drive.usercontent.google.com/download?id=1-EhLxEr_K738JJSBGmW09SyaMj6yvhfZ&export=download&confirm=t' \
             -o Emipokemon-0.5.0-alpha.7-source.zip
-          echo '2cfebeeeafedeaf1020bece7cfa1fc47819ceacc62ad6709f87bd7fe5bec6870  Emipokemon-0.5.0-alpha.7-source.zip' | sha256sum -c -
+          echo '2ea2d4853202f20ec8eefe4adfdfff66526647d0aa45451422a407f2bc852b0a  Emipokemon-0.5.0-alpha.7-source.zip' | sha256sum -c -
           mkdir work
           unzip -q Emipokemon-0.5.0-alpha.7-source.zip -d work
           grep -q 'mod_version=0.5.0-alpha.7' work/gradle.properties
@@ -38,7 +38,7 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          grep -q 'PokemonSpecies.getByIdentifier(identifier)' src/client/java/com/emipokemon/client/render/SeasonalPokemonWorldRenderer.java
+          grep -q 'PokemonProperties.Companion.parse(canonicalSpeciesId(speciesId)).create().getSpecies()' src/client/java/com/emipokemon/client/render/SeasonalPokemonWorldRenderer.java
           grep -q 'if (professor) return selectedFallback' src/client/java/com/emipokemon/client/render/CustomNpcRenderer.java
           grep -q 'RegistryKeys.STRUCTURE' src/main/java/com/emipokemon/admin/RegionalStructureAuditService.java
           grep -q 'literal("structures")' src/main/java/com/emipokemon/command/EmipokemonCommands.java
