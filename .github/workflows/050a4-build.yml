@@ -27,7 +27,7 @@ jobs:
           curl -fL --retry 3 --retry-delay 2 \
             'https://drive.usercontent.google.com/download?id=1sfORjWkWr8oHEMyV1gPP2RGJ_gLrvDsr&export=download&confirm=t' \
             -o Emipokemon-0.5.0-alpha.4-source.zip
-          echo '4c0dd68e098df9fe5cdeeb32faf1007178971a70fb6f79ceba199a4844da8a10  Emipokemon-0.5.0-alpha.4-source.zip' | sha256sum -c -
+          echo '191434c9ed92496157c2fd2826a688aa656ed9f7b9672afe2b30edc294280a9f  Emipokemon-0.5.0-alpha.4-source.zip' | sha256sum -c -
           mkdir work
           unzip -q Emipokemon-0.5.0-alpha.4-source.zip -d work
           grep -q 'mod_version=0.5.0-alpha.4' work/gradle.properties
