@@ -32,12 +32,20 @@ jobs:
           unzip -q alpha90-source.zip -d work
           grep -q 'mod_version=0.4.0-alpha.90' work/gradle.properties
 
-      - name: Rebuild approved alpha.98 base
+      - name: Rebuild exact approved alpha.98 base
         working-directory: work
         shell: bash
         run: |
           set -euxo pipefail
           python3 ../ci/alpha98/patch_alpha98.py
+          # alpha.98's final successful build corrected this shovel sprite byte-for-byte after the patch script.
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64, hashlib
+          data=base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAk0lEQVR4nGNgGGjASIriI3YT/8PYNofySdLLcMRu4v//X/7DsYqY1n/CutA0Pzj17v+DU+/+f3rwE24AEzGa9RZlMDy89p7h3t77JLkaDqzUXP7vaz+LYTvRmr/s8PivIqZFmWYGBgYGkjW/CJpLmo3ImstiWuis2UrN5b+Vmsv/iQVLybcZOcDIAipiWpQZQA4AACzccC3nCXbqAAAAAElFTkSuQmCC')
+          assert hashlib.sha256(data).hexdigest() == 'f528d40ff3f1cd947b5a6e2b8bbea9e5a0b2f4bbbec17b4eaaabf0a5d484399a'
+          Path('src/main/resources/assets/emipokemon/textures/item/emi_shovel.png').write_bytes(data)
+          PY
           grep -q 'mod_version=0.4.0-alpha.98' gradle.properties
           grep -q 'VERSION = "0.4.0-alpha.98"' src/main/java/com/emipokemon/Emipokemon.java
 
@@ -57,6 +65,7 @@ jobs:
           set -euxo pipefail
           python3 - <<'PY'
           from pathlib import Path
+          import hashlib, struct
           renderer=Path('src/client/java/com/emipokemon/client/render/SeasonalPokemonWorldRenderer.java').read_text()
           assert 'matrices.translate(0.5D, 5.18D + bob, 0.5D);' in renderer
           assert 'matrices.translate(0.5D, 4.50D + bob, 0.5D);' not in renderer
@@ -67,11 +76,19 @@ jobs:
           assert 'public int configVersion = 10;' in config
           assert 'migrateTreasureTicketRewards' in config
           assert '"treasure_ticket", "ITEM", "emipokemon:treasure_gacha_ticket", 1, 6' in config
-          # Preserve the approved alpha.98 tool path and alpha.90 armor path.
-          for tool in ('sword','pickaxe','axe','shovel','hoe'):
+          expected_pngs={
+            'sword':'1540614909181e432680a0860ed39702553929919b45b7681155b07d981e078b',
+            'pickaxe':'6954d581169275d213046e41772a57f934ab0ffd84f311e2ea6fc344e0d0c1d7',
+            'axe':'fe9d4f5d41e86122fcf040f5381bf173e0b0f5334a7314f95ce5a89e2a96774a',
+            'shovel':'f528d40ff3f1cd947b5a6e2b8bbea9e5a0b2f4bbbec17b4eaaabf0a5d484399a',
+            'hoe':'946b14b5ce1f31295c8be2cc401aff91bc63173051f10e8d6de6e6fde3690ca2'}
+          for tool, expected in expected_pngs.items():
+              data=Path(f'src/main/resources/assets/emipokemon/textures/item/emi_{tool}.png').read_bytes()
+              assert data[:8] == b'\x89PNG\r\n\x1a\n'
+              assert struct.unpack('>II',data[16:24]) == (16,16)
+              assert hashlib.sha256(data).hexdigest() == expected
               model=Path(f'src/main/resources/assets/emipokemon/models/item/emi_{tool}.json').read_text()
-              assert 'minecraft:item/handheld' in model
-              assert '"display"' not in model
+              assert 'minecraft:item/handheld' in model and '"display"' not in model
           client=Path('src/client/java/com/emipokemon/client/EmipokemonClient.java').read_text()
           assert 'registerEmiToolRenderer' not in client
           assert 'registerEmiArmorRenderer(ModRegistries.EMI_HELMET)' in client
