@@ -1,0 +1,118 @@
+name: Build Emipokemon 0.5.0-alpha.10 + EmiDungeonLoot 0.4.0
+
+on:
+  push:
+    branches:
+      - release/0.5.0-alpha.10
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Restore exact sources from Drive
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 3 --retry-delay 2 'https://drive.usercontent.google.com/download?id=18v0GLohI5mmVKQeaeBwLFe4C0mnANixN&export=download&confirm=t' -o Emipokemon-0.5.0-alpha.10-source.zip
+          curl -fL --retry 3 --retry-delay 2 'https://drive.usercontent.google.com/download?id=1Jq-XIfhGcgrKwxDpyi_CeYBnolqNjCZ3&export=download&confirm=t' -o EmiDungeonLoot-0.4.0+1.21.1-source.zip
+          echo '2a70bc766c93f836e6ffdb6764058114020550cf8975a45a269316229560cb88  Emipokemon-0.5.0-alpha.10-source.zip' | sha256sum -c -
+          echo 'dde35745522f948caad93a1623a8512edf97ac628d56549631cc628cec9c7343  EmiDungeonLoot-0.4.0+1.21.1-source.zip' | sha256sum -c -
+          mkdir emipokemon emidungeonloot
+          unzip -q Emipokemon-0.5.0-alpha.10-source.zip -d emipokemon
+          unzip -q EmiDungeonLoot-0.4.0+1.21.1-source.zip -d emidungeonloot
+
+      - name: Validate Emipokemon alpha.10 protected changes
+        working-directory: emipokemon
+        shell: bash
+        run: |
+          set -euxo pipefail
+          grep -q 'mod_version=0.5.0-alpha.10' gradle.properties
+          grep -q 'VERSION = "0.5.0-alpha.10"' src/main/java/com/emipokemon/Emipokemon.java
+          grep -q 'professor_emi_v4.png' src/main/java/com/emipokemon/admin/ProfessorNetworking.java
+          echo '5fedf1a66542bbc16c5786d667c92b220da086d4c43404accccec836c2fb3a64  src/main/resources/assets/emipokemon/textures/entity/professor_emi_v4.png' | sha256sum -c -
+          grep -q 'DungeonTrainerService.initialize()' src/main/java/com/emipokemon/Emipokemon.java
+          grep -q 'DungeonTrainerService.scaledTeam(player, npc)' src/main/java/com/emipokemon/npc/NpcBattleService.java
+          grep -q 'literal("dungeontrainers")' src/main/java/com/emipokemon/command/EmipokemonCommands.java
+          grep -q 'pokemonCatalog().get("eevee")' src/main/java/com/emipokemon/gacha/machine/GachaMachineBlockEntity.java
+          ! grep -q 'rctmod player set series' src/main/java/com/emipokemon/admin/PlayerResetService.java
+          echo '1540614909181e432680a0860ed39702553929919b45b7681155b07d981e078b  src/main/resources/assets/emipokemon/textures/item/emi_sword.png' | sha256sum -c -
+          echo '6954d581169275d213046e41772a57f934ab0ffd84f311e2ea6fc344e0d0c1d7  src/main/resources/assets/emipokemon/textures/item/emi_pickaxe.png' | sha256sum -c -
+          echo 'fe9d4f5d41e86122fcf040f5381bf173e0b0f5334a7314f95ce5a89e2a96774a  src/main/resources/assets/emipokemon/textures/item/emi_axe.png' | sha256sum -c -
+          echo 'f528d40ff3f1cd947b5a6e2b8bbea9e5a0b2f4bbbec17b4eaaabf0a5d484399a  src/main/resources/assets/emipokemon/textures/item/emi_shovel.png' | sha256sum -c -
+          echo '946b14b5ce1f31295c8be2cc401aff91bc63173051f10e8d6de6e6fde3690ca2  src/main/resources/assets/emipokemon/textures/item/emi_hoe.png' | sha256sum -c -
+
+      - name: Compile and test Emipokemon
+        working-directory: emipokemon
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sed -i 's/\r$//' gradlew && chmod +x gradlew
+          ./gradlew clean build -x test --no-daemon --stacktrace
+          ./gradlew test \
+            --tests com.emipokemon.v050a10.Version050Alpha10RegressionTest \
+            --tests com.emipokemon.alpha75.Alpha75WorldPokemonDisplayRegressionTest \
+            --tests com.emipokemon.challenge.ChallengeCatalogTest \
+            --tests com.emipokemon.progress.QuestCatalogTest \
+            --tests com.emipokemon.data.PlayerDataMigrationTest \
+            --tests com.emipokemon.alpha98.Alpha98VanillaHandheldToolsRegressionTest \
+            --tests com.emipokemon.alpha90.Alpha90HeartUvRegressionTest \
+            --no-daemon --stacktrace
+
+      - name: Validate EmiDungeonLoot 0.4.0
+        working-directory: emidungeonloot
+        shell: bash
+        run: |
+          set -euxo pipefail
+          grep -q 'mod_version=0.4.0+1.21.1' gradle.properties
+          grep -q 'dungeons_arise' src/main/java/com/emidungeonloot/DungeonLootInjector.java
+          grep -q 'betterdungeons' src/main/java/com/emidungeonloot/DungeonLootInjector.java
+          grep -q 'mr_dungeons_andtaverns' src/main/java/com/emidungeonloot/DungeonLootInjector.java
+          grep -q 'bosses_of_mass_destruction' src/main/java/com/emidungeonloot/DungeonLootInjector.java
+          grep -q 'COMMON(0.30D, 1)' src/main/java/com/emidungeonloot/DungeonTier.java
+          grep -q 'RARE(0.60D, 1)' src/main/java/com/emidungeonloot/DungeonTier.java
+          grep -q 'TREASURE(1.00D, 1)' src/main/java/com/emidungeonloot/DungeonTier.java
+          grep -q 'EPIC(1.00D, 2)' src/main/java/com/emidungeonloot/DungeonTier.java
+
+      - name: Compile and test EmiDungeonLoot
+        working-directory: emidungeonloot
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sed -i 's/\r$//' gradlew && chmod +x gradlew
+          ./gradlew clean build --no-daemon --stacktrace
+
+      - name: Verify final jars
+        shell: bash
+        run: |
+          set -euxo pipefail
+          ep='emipokemon/build/libs/emipokemon-0.5.0-alpha.10.jar'
+          dl='emidungeonloot/build/libs/emidungeonloot-0.4.0+1.21.1.jar'
+          test -f "$ep" && test -f "$dl"
+          unzip -p "$ep" fabric.mod.json | grep -q '0.5.0-alpha.10'
+          unzip -l "$ep" | grep -q 'assets/emipokemon/textures/entity/professor_emi_v4.png'
+          unzip -l "$ep" | grep -q 'com/emipokemon/dungeon/DungeonTrainerService.class'
+          unzip -p "$dl" fabric.mod.json | grep -q '0.4.0+1.21.1'
+          unzip -l "$dl" | grep -q 'com/emidungeonloot/DungeonLootInjector.class'
+          sha256sum "$ep" "$dl" Emipokemon-0.5.0-alpha.10-source.zip EmiDungeonLoot-0.4.0+1.21.1-source.zip > SHA256SUMS-alpha10-dungeonloot040.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Emipokemon-alpha10-and-EmiDungeonLoot-040
+          path: |
+            emipokemon/build/libs/emipokemon-0.5.0-alpha.10.jar
+            emidungeonloot/build/libs/emidungeonloot-0.4.0+1.21.1.jar
+            Emipokemon-0.5.0-alpha.10-source.zip
+            EmiDungeonLoot-0.4.0+1.21.1-source.zip
+            SHA256SUMS-alpha10-dungeonloot040.txt
+          if-no-files-found: error
