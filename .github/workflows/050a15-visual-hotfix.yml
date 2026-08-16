@@ -1,0 +1,164 @@
+name: Build Emipokemon 0.5.0-alpha.15 visual hotfix
+
+on:
+  push:
+    branches:
+      - release/0.5.0-alpha.15
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Restore exact alpha.14 source
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 3 --retry-delay 2 \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            'https://api.github.com/repos/andrewBristowx/Emipokemon/actions/artifacts/9256613515/zip' \
+            -o alpha14-artifact.zip
+          mkdir alpha14-artifact
+          unzip -q alpha14-artifact.zip -d alpha14-artifact
+          srczip="$(find alpha14-artifact -name 'Emipokemon-0.5.0-alpha.14-source.zip' -print -quit)"
+          test -n "$srczip"
+          mkdir emipokemon
+          unzip -q "$srczip" -d emipokemon
+
+      - name: Download official Cobblemon 1.7.3 Fabric jar
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 3 --retry-delay 2 'https://api.modrinth.com/v2/version/kF7CvxTo' -o cobblemon-version.json
+          python - <<'PY'
+          import json, urllib.request
+          d=json.load(open('cobblemon-version.json'))
+          chosen=next((f for f in d['files'] if f.get('primary') and 'fabric' in f['filename'].lower()), None)
+          if chosen is None:
+              chosen=next(f for f in d['files'] if 'fabric' in f['filename'].lower())
+          print('Downloading', chosen['filename'])
+          urllib.request.urlretrieve(chosen['url'], 'Cobblemon-1.7.3-fabric.jar')
+          PY
+          test -s Cobblemon-1.7.3-fabric.jar
+
+      - name: Apply alpha.15 visual repairs
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python ci/alpha15_visual_hotfix.py
+
+      - name: Bump version and write notes
+        working-directory: emipokemon
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sed -i 's/mod_version=0.5.0-alpha.14/mod_version=0.5.0-alpha.15/' gradle.properties
+          sed -i 's/VERSION = "0.5.0-alpha.14"/VERSION = "0.5.0-alpha.15"/' src/main/java/com/emipokemon/Emipokemon.java
+          cat > CHANGELOG-0.5.0-alpha.15.md <<'EOF'
+          # Emipokemon 0.5.0-alpha.15
+          - Corrige los nombres de todas las especies custom Emi usando las claves reales de Cobblemon 1.7.3.
+          - Floragato Emi usa el esqueleto y transformaciones oficiales, conservando solo sus piezas Emi añadidas; corrige los brazos levantados permanentemente.
+          - Sprigatito Emi también queda rebasado sobre el esqueleto oficial para evitar incompatibilidades de pose.
+          - Meowstic Emi usa los modelos y poser oficiales macho/hembra con las texturas Emi; ambas variantes vuelven a ser obtenibles.
+          - Unown 6, 7 y 67 conservan sus formas aceptadas, pero usan raíz/poser oficiales y bounds ampliados para evitar invisibilidad/culling.
+          - Mantiene shiny, Gasha Emi, Level Sync, dungeons, herramientas y sistemas aprobados.
+          EOF
+          cat > GUIA-PRUEBAS-0.5.0-alpha.15.md <<'EOF'
+          # Pruebas rápidas alpha.15
+          1. Arranca el mismo perfil con Emipokemon 0.5.0-alpha.15.
+          2. Los nombres deben verse como `Floragato Emi`, `Sprigatito Emi`, `Unown 6`, `Unown 7`, `Unown 67`, `Meowstic Emi`, etc.; nunca como `emipokemon.species...name`.
+          3. Saca Floragato Emi: los brazos deben usar la pose/animación normal de Floragato.
+          4. Saca Unown 6, 7 y 67 y confirma que los tres sean visibles desde varios ángulos.
+          5. Saca Meowstic Emi macho y hembra; ambos deben ser visibles y usar la textura Emi correspondiente.
+          6. Revisa normal y shiny.
+          7. Haz tiradas de Gasha Emi y confirma que siguen en el pool especial.
+          8. Prueba un entrenador de dungeon para confirmar que Level Sync sigue intacto.
+          EOF
+
+      - name: Validate protected systems
+        working-directory: emipokemon
+        shell: bash
+        run: |
+          set -euxo pipefail
+          grep -q 'mod_version=0.5.0-alpha.15' gradle.properties
+          grep -q 'VERSION = "0.5.0-alpha.15"' src/main/java/com/emipokemon/Emipokemon.java
+          grep -q 'dungeonLevelSyncConfig' src/main/java/com/emipokemon/npc/NpcBattleService.java
+          grep -q 'EMI_ACCEPTED_VARIANTS' src/main/java/com/emipokemon/gacha/banner/BannerManager.java
+          grep -q 'emipokemon.species.floragatoemi.name' src/main/resources/assets/emipokemon/lang/es_es.json
+          grep -q 'emipokemon.species.meowsticemi.name' src/main/resources/assets/emipokemon/lang/es_es.json
+          grep -q 'emipokemon.species.unown6.name' src/main/resources/assets/emipokemon/lang/es_es.json
+          grep -q '"maleRatio": 0.5' src/main/resources/data/emipokemon/species/custom/meowstic_emi.json
+          test ! -d src/main/resources/assets/cobblemon/bedrock/pokemon/models/meowstic_emi
+          echo '1540614909181e432680a0860ed39702553929919b45b7681155b07d981e078b  src/main/resources/assets/emipokemon/textures/item/emi_sword.png' | sha256sum -c -
+          echo '6954d581169275d213046e41772a57f934ab0ffd84f311e2ea6fc344e0d0c1d7  src/main/resources/assets/emipokemon/textures/item/emi_pickaxe.png' | sha256sum -c -
+          echo 'fe9d4f5d41e86122fcf040f5381bf173e0b0f5334a7314f95ce5a89e2a96774a  src/main/resources/assets/emipokemon/textures/item/emi_axe.png' | sha256sum -c -
+          echo 'f528d40ff3f1cd947b5a6e2b8bbea9e5a0b2f4bbbec17b4eaaabf0a5d484399a  src/main/resources/assets/emipokemon/textures/item/emi_shovel.png' | sha256sum -c -
+          echo '946b14b5ce1f31295c8be2cc401aff91bc63173051f10e8d6de6e6fde3690ca2  src/main/resources/assets/emipokemon/textures/item/emi_hoe.png' | sha256sum -c -
+
+      - name: Package source snapshot
+        shell: bash
+        run: |
+          set -euxo pipefail
+          (cd emipokemon && zip -qr ../Emipokemon-0.5.0-alpha.15-source.zip . -x '.gradle/*' 'build/*')
+
+      - name: Compile Emipokemon
+        working-directory: emipokemon
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sed -i 's/\r$//' gradlew && chmod +x gradlew
+          ./gradlew clean build -x test --no-daemon --stacktrace
+
+      - name: Run regression tests
+        working-directory: emipokemon
+        shell: bash
+        run: |
+          set -euxo pipefail
+          ./gradlew test \
+            --tests com.emipokemon.challenge.ChallengeCatalogTest \
+            --tests com.emipokemon.progress.QuestCatalogTest \
+            --tests com.emipokemon.data.PlayerDataMigrationTest \
+            --tests com.emipokemon.alpha98.Alpha98VanillaHandheldToolsRegressionTest \
+            --tests com.emipokemon.alpha90.Alpha90HeartUvRegressionTest \
+            --no-daemon --stacktrace
+
+      - name: Verify final jar
+        shell: bash
+        run: |
+          set -euxo pipefail
+          jar='emipokemon/build/libs/emipokemon-0.5.0-alpha.15.jar'
+          test -f "$jar"
+          unzip -p "$jar" fabric.mod.json | grep -q '0.5.0-alpha.15'
+          unzip -p "$jar" assets/emipokemon/lang/es_es.json | grep -q 'emipokemon.species.floragatoemi.name'
+          unzip -p "$jar" assets/emipokemon/lang/es_es.json | grep -q 'emipokemon.species.unown6.name'
+          unzip -p "$jar" assets/cobblemon/bedrock/pokemon/resolvers/meowstic_emi/0_meowstic_emi_base.json | grep -q 'emipokemon:meowstic_emi'
+          if unzip -l "$jar" | grep -q 'models/meowstic_emi/'; then
+            echo 'Unexpected copied Meowstic geometry remains in jar' >&2
+            exit 1
+          fi
+          sha256sum "$jar" Emipokemon-0.5.0-alpha.15-source.zip > SHA256SUMS-0.5.0-alpha.15.txt
+          cat SHA256SUMS-0.5.0-alpha.15.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Emipokemon-0.5.0-alpha.15-visual-hotfix
+          path: |
+            emipokemon/build/libs/emipokemon-0.5.0-alpha.15.jar
+            Emipokemon-0.5.0-alpha.15-source.zip
+            emipokemon/CHANGELOG-0.5.0-alpha.15.md
+            emipokemon/GUIA-PRUEBAS-0.5.0-alpha.15.md
+            SHA256SUMS-0.5.0-alpha.15.txt
