@@ -1,0 +1,299 @@
+name: Build Emipokemon 0.5.0-alpha.14 Cobblemon UV fix
+
+on:
+  push:
+    branches:
+      - release/0.5.0-alpha.14
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Restore exact alpha.13 source from successful artifact
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 3 --retry-delay 2 \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            'https://api.github.com/repos/andrewBristowx/Emipokemon/actions/artifacts/9256127842/zip' \
+            -o alpha13-artifact.zip
+          mkdir alpha13-artifact
+          unzip -q alpha13-artifact.zip -d alpha13-artifact
+          srczip="$(find alpha13-artifact -name 'Emipokemon-0.5.0-alpha.13-source.zip' -print -quit)"
+          test -n "$srczip"
+          mkdir emipokemon
+          unzip -q "$srczip" -d emipokemon
+
+      - name: Download official Cobblemon 1.7.3 Fabric jar
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 3 --retry-delay 2 'https://api.modrinth.com/v2/version/kF7CvxTo' -o cobblemon-version.json
+          python - <<'PY'
+          import json, urllib.request
+          d=json.load(open('cobblemon-version.json'))
+          chosen=next((f for f in d['files'] if f.get('primary') and 'fabric' in f['filename'].lower()), None)
+          if chosen is None:
+              chosen=next(f for f in d['files'] if 'fabric' in f['filename'].lower())
+          print('Downloading', chosen['filename'])
+          urllib.request.urlretrieve(chosen['url'], 'Cobblemon-1.7.3-fabric.jar')
+          PY
+          test -s Cobblemon-1.7.3-fabric.jar
+
+      - name: Repair Sprigatito and Floragato geometry for Cobblemon loader
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python - <<'PY'
+          import copy, json, math, os, pathlib, zipfile
+
+          root=pathlib.Path('emipokemon')
+          jar=pathlib.Path('Cobblemon-1.7.3-fabric.jar')
+
+          def find_official_geometry(z, species):
+              exact=[]
+              fallback=[]
+              for name in z.namelist():
+                  low=name.lower()
+                  if not low.endswith('.geo.json') or '/bedrock/pokemon/models/' not in low:
+                      continue
+                  if species not in low:
+                      continue
+                  try:
+                      doc=json.loads(z.read(name))
+                  except Exception:
+                      continue
+                  for geom in doc.get('minecraft:geometry', []):
+                      ident=geom.get('description',{}).get('identifier','')
+                      if ident == f'geometry.{species}':
+                          exact.append((name, geom))
+                      elif species in ident.lower():
+                          fallback.append((name, geom))
+              matches=exact or fallback
+              if not matches:
+                  raise RuntimeError(f'Official geometry not found for {species}')
+              matches.sort(key=lambda x:(len(x[0]),x[0]))
+              print('Official', species, '=>', matches[0][0], matches[0][1].get('description',{}).get('identifier'))
+              return copy.deepcopy(matches[0][1])
+
+          def box_uv_from_per_face(cube, bone_name):
+              uv=cube.get('uv')
+              if not isinstance(uv, dict):
+                  return cube
+              west=uv.get('west')
+              north=uv.get('north')
+              if not west or not north or 'uv' not in west or 'uv_size' not in west:
+                  raise RuntimeError(f'Cannot recover Box UV for {bone_name}: {uv}')
+              wz=abs(float(west['uv_size'][0]))
+              if float(west['uv_size'][0]) <= 0:
+                  raise RuntimeError(f'Unexpected mirrored Emi accessory UV in {bone_name}: {uv}')
+              u=float(west['uv'][0])
+              v=float(west['uv'][1])-wz
+              # Validate the characteristic Box-UV side row before replacing it.
+              nx=float(north['uv'][0])
+              ny=float(north['uv'][1])
+              if abs(nx-(u+wz)) > 0.11 or abs(ny-(v+wz)) > 0.11:
+                  raise RuntimeError(f'Per-face UV is not recoverable Box UV for {bone_name}: {uv}')
+              def clean(x):
+                  r=round(x,4)
+                  return int(r) if abs(r-round(r)) < 1e-9 else r
+              cube=copy.deepcopy(cube)
+              cube['uv']=[clean(u),clean(v)]
+              return cube
+
+          def merge(species):
+              custom_path=root/f'src/main/resources/assets/cobblemon/bedrock/pokemon/models/{species}_emi/{species}_emi.geo.json'
+              custom_doc=json.load(open(custom_path,encoding='utf-8'))
+              custom=custom_doc['minecraft:geometry'][0]
+              with zipfile.ZipFile(jar) as z:
+                  official=find_official_geometry(z,species)
+
+              official_bones={b.get('name'):b for b in official.get('bones',[])}
+              custom_names={b.get('name') for b in custom.get('bones',[])}
+              merged=[]
+
+              for cb in custom.get('bones',[]):
+                  name=cb.get('name')
+                  if name.startswith('emi_'):
+                      nb=copy.deepcopy(cb)
+                      nb['cubes']=[box_uv_from_per_face(c,name) for c in cb.get('cubes',[])]
+                      merged.append(nb)
+                      continue
+
+                  ob=official_bones.get(name)
+                  if ob is None:
+                      # Preserve non-Emi custom grouping bones only if they contain no incompatible cubes.
+                      nb=copy.deepcopy(cb)
+                      for c in nb.get('cubes',[]):
+                          if isinstance(c.get('uv'),dict):
+                              raise RuntimeError(f'Base bone {species}:{name} missing in official model and still has per-face UV')
+                      merged.append(nb)
+                      continue
+
+                  nb=copy.deepcopy(cb)
+                  cc=nb.get('cubes',[])
+                  oc=ob.get('cubes',[])
+                  if len(cc) != len(oc):
+                      raise RuntimeError(f'Cube count mismatch {species}:{name}: custom={len(cc)} official={len(oc)}')
+                  for idx,(custom_cube,official_cube) in enumerate(zip(cc,oc)):
+                      if 'uv' not in official_cube or not isinstance(official_cube.get('uv'),list):
+                          raise RuntimeError(f'Official cube lacks Box UV {species}:{name}[{idx}]')
+                      custom_cube['uv']=copy.deepcopy(official_cube['uv'])
+                      # Preserve the official mirror flag when the base asset uses it for Box UV orientation.
+                      if 'mirror' in official_cube:
+                          custom_cube['mirror']=official_cube['mirror']
+                  merged.append(nb)
+
+              # Keep any official helper bones absent from the accepted custom export.
+              for ob in official.get('bones',[]):
+                  if ob.get('name') not in custom_names:
+                      merged.append(copy.deepcopy(ob))
+
+              custom['bones']=merged
+              custom.setdefault('description',{})['identifier']=f'geometry.{species}_emi'
+              custom_doc['format_version']='1.12.0'
+              with open(custom_path,'w',encoding='utf-8') as f:
+                  json.dump(custom_doc,f,ensure_ascii=False,indent=2)
+                  f.write('\n')
+              print('Repaired', species, 'bones=',len(merged))
+
+          for species in ('sprigatito','floragato'):
+              merge(species)
+
+          # Cobblemon 1.7.3's loader in the user's log expects cube.uv to be an array.
+          bad=[]
+          model_root=root/'src/main/resources/assets/cobblemon/bedrock/pokemon/models'
+          for p in model_root.rglob('*.geo.json'):
+              try:
+                  doc=json.load(open(p,encoding='utf-8'))
+              except Exception:
+                  continue
+              for gi,g in enumerate(doc.get('minecraft:geometry',[])):
+                  for bi,b in enumerate(g.get('bones',[])):
+                      for ci,c in enumerate(b.get('cubes',[])):
+                          if isinstance(c.get('uv'),dict):
+                              bad.append(f'{p}:{gi}/{bi}/{ci}')
+          if bad:
+              raise RuntimeError('Per-face UV still present in bundled Cobblemon models:\n'+'\n'.join(bad[:30]))
+          print('UV validation OK: no object/per-face cube UV remains in bundled models')
+          PY
+
+      - name: Bump version and write alpha.14 notes
+        working-directory: emipokemon
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sed -i 's/mod_version=0.5.0-alpha.13/mod_version=0.5.0-alpha.14/' gradle.properties
+          sed -i 's/VERSION = "0.5.0-alpha.13"/VERSION = "0.5.0-alpha.14"/' src/main/java/com/emipokemon/Emipokemon.java
+          cat > CHANGELOG-0.5.0-alpha.14.md <<'EOF'
+          # Emipokemon 0.5.0-alpha.14
+          - Corrige el bloqueo/pantalla negra de alpha.13 durante la recarga de recursos de Cobblemon.
+          - Sprigatito Emi y Floragato Emi ahora usan Box UV compatible con el cargador Bedrock de Cobblemon 1.7.3.
+          - Conserva la geometría aceptada, las antenas Emi, la luna, texturas normal/shiny y sus líneas evolutivas.
+          - Valida todos los modelos Cobblemon incluidos por Emipokemon y rechaza cualquier cube.uv en formato objeto/per-face.
+          - Mantiene Level Sync, contenido de dungeons, gasha Emi y herramientas/armadura sin regresiones intencionales.
+          EOF
+          cat > GUIA-PRUEBAS-0.5.0-alpha.14.md <<'EOF'
+          # Pruebas rápidas alpha.14
+          1. Sustituye alpha.12/alpha.13 por Emipokemon 0.5.0-alpha.14.
+          2. Inicia el mismo perfil Cobbleverse: debe llegar al menú y no quedarse en negro durante `Loading varying Bedrock assets`.
+          3. Genera Sprigatito Emi y Floragato Emi y revisa geometría, antenas, luna y textura.
+          4. Revisa normal y shiny.
+          5. Haz tiradas de Gasha Emi y confirma que las variantes siguen en el pool especial.
+          6. Prueba un entrenador de dungeon para confirmar que Level Sync sigue funcionando.
+          EOF
+
+      - name: Validate protected systems
+        working-directory: emipokemon
+        shell: bash
+        run: |
+          set -euxo pipefail
+          grep -q 'mod_version=0.5.0-alpha.14' gradle.properties
+          grep -q 'VERSION = "0.5.0-alpha.14"' src/main/java/com/emipokemon/Emipokemon.java
+          grep -q 'dungeonLevelSyncConfig' src/main/java/com/emipokemon/npc/NpcBattleService.java
+          grep -q 'EMI_ACCEPTED_VARIANTS' src/main/java/com/emipokemon/gacha/banner/BannerManager.java
+          grep -q 'sprigatito_emi' src/main/java/com/emipokemon/gacha/catalog/PokemonCatalogService.java
+          grep -q 'floragato_emi' src/main/java/com/emipokemon/gacha/catalog/PokemonCatalogService.java
+          echo '1540614909181e432680a0860ed39702553929919b45b7681155b07d981e078b  src/main/resources/assets/emipokemon/textures/item/emi_sword.png' | sha256sum -c -
+          echo '6954d581169275d213046e41772a57f934ab0ffd84f311e2ea6fc344e0d0c1d7  src/main/resources/assets/emipokemon/textures/item/emi_pickaxe.png' | sha256sum -c -
+          echo 'fe9d4f5d41e86122fcf040f5381bf173e0b0f5334a7314f95ce5a89e2a96774a  src/main/resources/assets/emipokemon/textures/item/emi_axe.png' | sha256sum -c -
+          echo 'f528d40ff3f1cd947b5a6e2b8bbea9e5a0b2f4bbbec17b4eaaabf0a5d484399a  src/main/resources/assets/emipokemon/textures/item/emi_shovel.png' | sha256sum -c -
+          echo '946b14b5ce1f31295c8be2cc401aff91bc63173051f10e8d6de6e6fde3690ca2  src/main/resources/assets/emipokemon/textures/item/emi_hoe.png' | sha256sum -c -
+
+      - name: Package source snapshot
+        shell: bash
+        run: |
+          set -euxo pipefail
+          (cd emipokemon && zip -qr ../Emipokemon-0.5.0-alpha.14-source.zip . -x '.gradle/*' 'build/*')
+
+      - name: Compile Emipokemon
+        working-directory: emipokemon
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sed -i 's/\r$//' gradlew && chmod +x gradlew
+          ./gradlew clean build -x test --no-daemon --stacktrace
+
+      - name: Run regression tests
+        working-directory: emipokemon
+        shell: bash
+        run: |
+          set -euxo pipefail
+          ./gradlew test \
+            --tests com.emipokemon.challenge.ChallengeCatalogTest \
+            --tests com.emipokemon.progress.QuestCatalogTest \
+            --tests com.emipokemon.data.PlayerDataMigrationTest \
+            --tests com.emipokemon.alpha98.Alpha98VanillaHandheldToolsRegressionTest \
+            --tests com.emipokemon.alpha90.Alpha90HeartUvRegressionTest \
+            --no-daemon --stacktrace
+
+      - name: Verify final jar and bundled geometry
+        shell: bash
+        run: |
+          set -euxo pipefail
+          jar='emipokemon/build/libs/emipokemon-0.5.0-alpha.14.jar'
+          test -f "$jar"
+          unzip -p "$jar" fabric.mod.json | grep -q '0.5.0-alpha.14'
+          python - <<'PY'
+          import json,zipfile
+          jar='emipokemon/build/libs/emipokemon-0.5.0-alpha.14.jar'
+          with zipfile.ZipFile(jar) as z:
+              for species in ('sprigatito','floragato'):
+                  p=f'assets/cobblemon/bedrock/pokemon/models/{species}_emi/{species}_emi.geo.json'
+                  doc=json.loads(z.read(p))
+                  assert doc['minecraft:geometry'][0]['description']['identifier']==f'geometry.{species}_emi'
+                  names={b['name'] for b in doc['minecraft:geometry'][0]['bones']}
+                  assert 'emi_antenna_right' in names and 'emi_antenna_left' in names and 'emi_belly_moon' in names
+                  for b in doc['minecraft:geometry'][0]['bones']:
+                      for c in b.get('cubes',[]):
+                          assert not isinstance(c.get('uv'),dict), (species,b['name'])
+          print('Final jar geometry validation OK')
+          PY
+          sha256sum "$jar" Emipokemon-0.5.0-alpha.14-source.zip > SHA256SUMS-0.5.0-alpha.14.txt
+          cat SHA256SUMS-0.5.0-alpha.14.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Emipokemon-0.5.0-alpha.14-cobblemon-uv-fix
+          path: |
+            emipokemon/build/libs/emipokemon-0.5.0-alpha.14.jar
+            Emipokemon-0.5.0-alpha.14-source.zip
+            emipokemon/CHANGELOG-0.5.0-alpha.14.md
+            emipokemon/GUIA-PRUEBAS-0.5.0-alpha.14.md
+            SHA256SUMS-0.5.0-alpha.14.txt
+          if-no-files-found: error
